@@ -48,16 +48,16 @@ background-color:#ff6f00;
 st.title("⛽ Choisons Petrol Pump Management System")
 # ---------------- MANAGER CONTACT ----------------
 
-st.subheader(" Contact Details")
+st.text(" Contact Details")
 
-col1, col2 = st.columns(2)
+col1 = st.columns(1)
 with col1:
     phone = "+91 8590304889"
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
-   
 st.info(f"""
 Phone: {phone}
 Email: {email}
+Created by Nazeeh
 """)                                         
 
 # ---------------- FUEL PRICES ----------------
