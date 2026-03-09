@@ -7,6 +7,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# Title
 st.title("⛽ CHOISONS PETROL PUMP")
 st.subheader("HPCL Dealer | Quality Fuel & Trusted Service")
 
@@ -20,7 +21,7 @@ if menu == "Home":
 
     st.header("Welcome to Choisons Petrol Pump")
 
-    # Add your generated image here
+    # Add your image file here
     st.image("choisons_pump.png", use_container_width=True)
 
     st.markdown("""
@@ -54,9 +55,9 @@ elif menu == "Daily Sales Entry":
 
     st.header("Daily Sales Entry")
 
-    petrol_sales = st.number_input("Petrol Sales ₹")
-    diesel_sales = st.number_input("Diesel Sales ₹")
-    oil_sales = st.number_input("Oil Sales ₹")
+    petrol_sales = st.number_input("Petrol Sales ₹", value=0)
+    diesel_sales = st.number_input("Diesel Sales ₹", value=0)
+    oil_sales = st.number_input("Oil Sales ₹", value=0)
 
     total_sales = petrol_sales + diesel_sales + oil_sales
 
@@ -67,9 +68,9 @@ elif menu == "Cash Balance":
 
     st.header("Cash Counter Balance")
 
-    opening_cash = st.number_input("Opening Cash ₹")
-    sales_cash = st.number_input("Cash Sales ₹")
-    expenses = st.number_input("Expenses ₹")
+    opening_cash = st.number_input("Opening Cash ₹", value=0)
+    sales_cash = st.number_input("Cash Sales ₹", value=0)
+    expenses = st.number_input("Expenses ₹", value=0)
 
     balance = opening_cash + sales_cash - expenses
 
@@ -96,5 +97,13 @@ elif menu == "Contact":
 
     st.write("📍 Choisons Petrol Pump")
     st.write("Kannur Road, Calicut")
-    st.write("📞 Phone: +91 8590304889)
-    st.write("✉ Gmail: choisonscalicut@gmail.com")
+    st.write("📞 Phone: +91 8590304889")
+    st.write("📧 Email: choisons@gmail.com")
+
+    # Map location
+    map_data = pd.DataFrame({
+        'lat':[11.2588],
+        'lon':[75.7804]
+    })
+
+    st.map(map_data)
