@@ -76,13 +76,13 @@ if st.session_state.admin_logged:
 col1, col2 = st.columns(2)
 with col1:
     phone = "+91 8590304889"
-    email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
+    email = "kvpnaseeh@gmail.com"
+    email2 = "choisonscalicut@gmail.com"
 st.info(f'''
 **Contact Details**
-
-
 Phone: {phone}\n
 Email: {email}
+Email: {email2}
 Created by Nazeeh
 ''')                                         
 
