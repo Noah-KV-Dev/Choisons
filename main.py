@@ -59,7 +59,6 @@ with col1:
    
 st.info(f"""
 Phone: {phone}
-
 Email: {email}
 """)                                         
 
