@@ -55,9 +55,10 @@ with col1:
     phone = "+91 8590304889"
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
 st.info(f"""
-st.subheader("Contact Details")
+Contact Details
 Phone: {phone}
-Email: {email}\n Created by Nazeeh
+Email: {email}\n 
+Created by Nazeeh
 """)                                         
 
 # ---------------- FUEL PRICES ----------------
