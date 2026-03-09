@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+from datetime import date
 
 st.set_page_config(
     page_title="Choisons Petrolium Private Limited",
@@ -8,161 +9,205 @@ st.set_page_config(
     layout="wide"
 )
 
-# ORANGE THEME STYLE
+# ORANGE THEME
 st.markdown("""
 <style>
 
-.stApp {
-    background-color: #fff8f0;
+.stApp{
+background-color:#fff7ef;
 }
 
-h1, h2, h3 {
-    color: #ff6b00;
+h1,h2,h3{
+color:#ff6b00;
 }
 
-div.stButton > button {
-    background-color: #ff6b00;
-    color: white;
-    border-radius: 8px;
-}
-
-.sidebar .sidebar-content {
-    background-color: #fff1e6;
+.stButton>button{
+background-color:#ff6b00;
+color:white;
+border-radius:8px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-st.title("⛽ CHOISONS PETROLIUM PRIVATE LIMITED")
-st.subheader("HPCL Dealer | Quality Fuel & Trusted Service")
 
-menu = st.sidebar.selectbox(
-    "Navigation",
-    ["Home", "Fuel Prices", "Daily Sales Entry", "Cash Balance", "Services", "Contact"]
-)
+# LOGIN SESSION
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# HOME PAGE
-if menu == "Home":
+if "attendance" not in st.session_state:
+    st.session_state.attendance = []
 
-    st.header("Welcome to Choisons Petrolium Private Limited")
+if "sales" not in st.session_state:
+    st.session_state.sales = []
 
-    image_path = "choisons_pump.png"
 
-    if os.path.exists(image_path):
-        st.image(image_path, use_container_width=True)
-    else:
-        st.warning("Petrol pump image not found. Please upload 'choisons_pump.png'.")
+# LOGIN PAGE
+if not st.session_state.logged_in:
 
-    st.markdown("""
-### Our Fuel Station
+    st.title("⛽ Choisons Petrolium Private Limited")
+    st.subheader("Staff Login")
 
-- High Quality HP Petrol  
-- Diesel Fuel  
-- Lubricants  
-- Free Air & Water  
-- Fast Billing  
-- Friendly Staff  
-""")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-    st.success("Open 24 Hours 🚗")
+    if st.button("Login"):
 
+        if username == "admin" and password == "1234":
+            st.session_state.logged_in = True
+            st.success("Login successful")
+            st.rerun()
+
+        else:
+            st.error("Invalid login")
+
+else:
+
+    st.sidebar.success("Logged in")
+
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+    menu = st.sidebar.selectbox(
+        "Dashboard",
+        ["Home","Staff Attendance","Nozzle Sales Entry","Fuel Prices","Services","Contact"]
+    )
+
+# HOME
+    if menu == "Home":
+
+        st.title("⛽ CHOISONS PETROLIUM PRIVATE LIMITED")
+        st.success("24 Hour Fuel Service")
+
+        image_path = "choisons_pump.png"
+
+        if os.path.exists(image_path):
+            st.image(image_path, use_container_width=True)
+
+# STAFF ATTENDANCE
+    elif menu == "Staff Attendance":
+
+        st.header("Staff Attendance Register")
+
+        col1,col2,col3 = st.columns(3)
+
+        with col1:
+            staff_name = st.text_input("Staff Name")
+
+        with col2:
+            staff_id = st.text_input("Staff ID")
+
+        with col3:
+            shift = st.selectbox("Shift",["Morning","Evening","Night"])
+
+        if st.button("Mark Attendance"):
+
+            st.session_state.attendance.append({
+                "Date":date.today(),
+                "Name":staff_name,
+                "Staff ID":staff_id,
+                "Shift":shift
+            })
+
+            st.success("Attendance recorded")
+
+        if st.session_state.attendance:
+
+            df = pd.DataFrame(st.session_state.attendance)
+
+            st.subheader("Attendance List")
+            st.dataframe(df,use_container_width=True)
+
+# NOZZLE SALES ENTRY
+    elif menu == "Nozzle Sales Entry":
+
+        st.header("Nozzle Sales Entry")
+
+        col1,col2,col3 = st.columns(3)
+
+        with col1:
+            nozzle = st.selectbox(
+                "Nozzle",
+                ["Petrol Nozzle 1","Petrol Nozzle 2","Diesel Nozzle 1","Diesel Nozzle 2"]
+            )
+
+        with col2:
+            opening = st.number_input("Opening Meter",0)
+
+        with col3:
+            closing = st.number_input("Closing Meter",0)
+
+        total_litres = closing - opening
+
+        st.info(f"Total Litres Sold: {total_litres}")
+
+        if st.button("Save Sales"):
+
+            st.session_state.sales.append({
+                "Date":date.today(),
+                "Nozzle":nozzle,
+                "Opening":opening,
+                "Closing":closing,
+                "Litres Sold":total_litres
+            })
+
+            st.success("Sales entry saved")
+
+        if st.session_state.sales:
+
+            df = pd.DataFrame(st.session_state.sales)
+
+            st.subheader("Nozzle Sales Report")
+            st.dataframe(df,use_container_width=True)
 
 # FUEL PRICES
-elif menu == "Fuel Prices":
+    elif menu == "Fuel Prices":
 
-    st.header("Today's Fuel Prices")
+        st.header("Fuel Price Panel")
 
-    col1, col2 = st.columns(2)
+        col1,col2 = st.columns(2)
 
-    with col1:
-        petrol = st.number_input("Petrol Price (₹)", value=105.00)
+        with col1:
+            petrol = st.number_input("Petrol Price ₹",105.00)
 
-    with col2:
-        diesel = st.number_input("Diesel Price (₹)", value=95.00)
+        with col2:
+            diesel = st.number_input("Diesel Price ₹",95.00)
 
-    st.write(f"Petrol : ₹ {petrol}")
-    st.write(f"Diesel : ₹ {diesel}")
-
-
-# DAILY SALES
-elif menu == "Daily Sales Entry":
-
-    st.header("Daily Sales Entry")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        petrol_sales = st.number_input("Petrol Sales ₹", 0)
-
-    with col2:
-        diesel_sales = st.number_input("Diesel Sales ₹", 0)
-
-    with col3:
-        oil_sales = st.number_input("Oil Sales ₹", 0)
-
-    total = petrol_sales + diesel_sales + oil_sales
-
-    st.success(f"Total Sales ₹ {total}")
-
-
-# CASH BALANCE
-elif menu == "Cash Balance":
-
-    st.header("Cash Counter Balance")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        opening = st.number_input("Opening Cash ₹", 0)
-
-    with col2:
-        sales = st.number_input("Cash Sales ₹", 0)
-
-    with col3:
-        expense = st.number_input("Expenses ₹", 0)
-
-    balance = opening + sales - expense
-
-    st.success(f"Closing Balance ₹ {balance}")
-
+        st.success(f"Petrol ₹ {petrol}")
+        st.success(f"Diesel ₹ {diesel}")
 
 # SERVICES
-elif menu == "Services":
+    elif menu == "Services":
 
-    st.header("Our Services")
+        st.header("Services")
 
-    col1, col2 = st.columns(2)
+        col1,col2 = st.columns(2)
 
-    with col1:
-        st.markdown("""
-- Petrol & Diesel  
-- Engine Oil  
-- Free Air  
-- Drinking Water  
-""")
+        with col1:
+            st.write("• Petrol & Diesel")
+            st.write("• Engine Oil")
+            st.write("• Free Air")
+            st.write("• Drinking Water")
 
-    with col2:
-        st.markdown("""
-- UPI / Cash / Card Payment  
-- Clean Restroom  
-- **Credit Sales Available**  
-- 24x7 Service  
-""")
-
+        with col2:
+            st.write("• UPI / Cash / Card")
+            st.write("• Clean Restroom")
+            st.write("• Credit Sales Available")
+            st.write("• 24x7 Service")
 
 # CONTACT
-elif menu == "Contact":
+    elif menu == "Contact":
 
-    st.header("Contact Us")
+        st.header("Contact")
 
-    st.write("📍 Choisons Petrol Pump")
-    st.write("Kannur Road, Calicut")
-    st.write("📞 Phone: +91 8590304889")
-    st.write("📧 Email: choisons@gmail.com")
+        st.write("📍 Kannur Road, Calicut")
+        st.write("📞 +91 8590304889")
+        st.write("📧 choisons@gmail.com")
 
-    map_data = pd.DataFrame({
-        "lat":[11.2588],
-        "lon":[75.7804]
-    })
+        map_data = pd.DataFrame({
+            "lat":[11.2588],
+            "lon":[75.7804]
+        })
 
-    st.map(map_data)
+        st.map(map_data)
