@@ -204,18 +204,6 @@ st.subheader("Sales Records")
 
 st.dataframe(df,use_container_width=True)
 
-
-# ---------------- DAILY SALES ----------------
-
-st.subheader("Daily Sales Summary")
-
-today = str(date.today())
-
-today_data = df[df["date"] == today]
-
-st.metric("Litres Today",round(today_data["litres"].sum(),2))
-st.metric("Sales Today",round(today_data["total"].sum(),2))
-
 # ---------------- ADMIN EDIT RECORD ----------------
 
 if st.session_state.admin_logged:
@@ -278,6 +266,19 @@ if st.session_state.admin_logged:
 
             st.success("Record Updated Successfully")
             st.rerun()
+
+
+# ---------------- DAILY SALES ----------------
+
+st.subheader("Daily Sales Summary")
+
+today = str(date.today())
+
+today_data = df[df["date"] == today]
+
+st.metric("Litres Today",round(today_data["litres"].sum(),2))
+st.metric("Sales Today",round(today_data["total"].sum(),2))
+
 
 # ---------------- ADMIN DELETE CONTROL ----------------
 
