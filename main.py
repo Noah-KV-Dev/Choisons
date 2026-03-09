@@ -2,127 +2,79 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-# ---------------- PAGE SETTINGS ----------------
+# PAGE SETTINGS
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
-st.set_page_config(
-    page_title="Choisons Petrol Pump",
-    page_icon="⛽",
-    layout="wide"
-)
-
-# ---------------- STYLE ----------------
-
+# STYLE
 st.markdown("""
 <style>
-
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
 
 html, body, [class*="css"] {
-    font-family: 'Lexend', sans-serif;
-    color: black;
-}
-
-.stApp {
-    background-color:#ff6f00;
-}
-
-h1,h2,h3{
+font-family: 'Lexend', sans-serif;
 color:black;
 }
 
-div[data-baseweb="select"] > div{
-background-color:white;
-color:black;
+.stApp{
+background-color:#ff6f00;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- HEADER ----------------
+# HEADER
+st.title("⛽ Choisons Petrol Pump Sales System")
 
-st.title("⛽ Choisons Petrol Pump Management System")
-
-# ---------------- PUMP IMAGE ----------------
-
-st.image("choisons_pump.png", use_column_width=True)
-
-st.divider()
-
-# ---------------- SESSION STORAGE ----------------
-
+# SESSION STORAGE
 if "sales_data" not in st.session_state:
     st.session_state.sales_data = pd.DataFrame(columns=[
         "Date",
-        "Staff Name",
-        "Fuel Type",
+        "Staff",
         "Nozzle",
         "Litres",
-        "Price per Litre",
-        "Total Amount"
+        "Price",
+        "Total"
     ])
 
-# ---------------- STAFF ENTRY ----------------
-
-st.subheader("👨‍💼 Staff Sales Entry")
+# ENTRY SECTION
+st.subheader("Sales Entry")
 
 col1,col2,col3 = st.columns(3)
 
 with col1:
-    staff_name = st.text_input("Staff Name")
+    staff = st.text_input("Staff Name")
 
 with col2:
-    entry_date = st.date_input("Date", date.today())
+    entry_date = st.date_input("Date",date.today())
 
 with col3:
-    fuel_type = st.selectbox(
-        "Fuel Type",
-        ["Petrol","Diesel","Power Petrol"]
-    )
+    nozzle = st.selectbox("Nozzle",
+    [
+    "Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
+    "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"
+    ])
 
-# ---------------- NOZZLE SALES ----------------
-
-st.subheader("⛽ Nozzle Sales Entry")
-
-col4,col5,col6 = st.columns(3)
+col4,col5 = st.columns(2)
 
 with col4:
-    nozzle = st.selectbox(
-        "Select Nozzle",
-        ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4"]
-    )
+    litres = st.number_input("Litres Sold",min_value=0.0)
 
 with col5:
-    litres = st.number_input(
-        "Litres Sold",
-        min_value=0.0,
-        step=0.01
-    )
+    price = st.number_input("Price Per Litre",min_value=0.0)
 
-with col6:
-    price = st.number_input(
-        "Price Per Litre",
-        min_value=0.0,
-        step=0.01
-    )
-
-# ---------------- TOTAL ----------------
-
+# TOTAL
 total = litres * price
+st.success(f"Total Amount ₹ {round(total,2)}")
 
-st.success(f"Total Amount: ₹ {round(total,2)}")
-
-# ---------------- SAVE BUTTON ----------------
-
-if st.button("Save Sales Entry"):
+# SAVE BUTTON
+if st.button("Save Entry"):
 
     new_row = pd.DataFrame({
         "Date":[entry_date],
-        "Staff Name":[staff_name],
-        "Fuel Type":[fuel_type],
+        "Staff":[staff],
         "Nozzle":[nozzle],
         "Litres":[litres],
-        "Price per Litre":[price],
-        "Total Amount":[total]
+        "Price":[price],
+        "Total":[total]
     })
 
     st.session_state.sales_data = pd.concat(
@@ -130,60 +82,64 @@ if st.button("Save Sales Entry"):
         ignore_index=True
     )
 
-    st.success("Sales Entry Saved")
+    st.success("Saved Successfully")
 
-# ---------------- SALES RECORD ----------------
-
-st.subheader("📊 Sales Records")
+# SALES TABLE
+st.subheader("Sales Data Table")
 
 st.dataframe(
     st.session_state.sales_data,
     use_container_width=True
 )
 
-# ---------------- DAILY SUMMARY ----------------
+# DAILY TOTAL
+st.subheader("Daily Total")
 
-st.subheader("📅 Daily Summary")
+df = st.session_state.sales_data
 
-today = pd.to_datetime(date.today())
+if not df.empty:
 
-if not st.session_state.sales_data.empty:
-
-    df = st.session_state.sales_data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
+    today = pd.to_datetime(date.today())
 
-    today_sales = df[df["Date"] == today]
+    today_data = df[df["Date"] == today]
 
-    daily_litres = today_sales["Litres"].sum()
-    daily_amount = today_sales["Total Amount"].sum()
+    daily_litre = today_data["Litres"].sum()
+    daily_amount = today_data["Total"].sum()
 
 else:
-    daily_litres = 0
+    daily_litre = 0
     daily_amount = 0
 
-col7,col8 = st.columns(2)
+col6,col7 = st.columns(2)
+
+with col6:
+    st.metric("Total Litres Today",round(daily_litre,2))
 
 with col7:
-    st.metric("Total Litres Sold Today", round(daily_litres,2))
+    st.metric("Total Sales Today",f"₹ {round(daily_amount,2)}")
 
-with col8:
-    st.metric("Total Sales Today", f"₹ {round(daily_amount,2)}")
+# MONTHLY STAFF REPORT
+st.subheader("Monthly Litre Sale Per Staff")
 
-# ---------------- MONTHLY REPORT ----------------
+if not df.empty:
 
-st.subheader("📈 Monthly Meter Report")
+    monthly_staff = df.groupby("Staff")["Litres"].sum().reset_index()
 
-if not st.session_state.sales_data.empty:
+    monthly_staff.columns = ["Staff Name","Total Litres Sold"]
 
-    df = st.session_state.sales_data.copy()
-
-    df["Date"] = pd.to_datetime(df["Date"])
-
-    monthly = df.groupby(
-        df["Date"].dt.to_period("M")
-    )[["Litres","Total Amount"]].sum()
-
-    st.dataframe(monthly)
+    st.dataframe(monthly_staff,use_container_width=True)
 
 else:
-    st.info("No sales data available yet.")
+    st.info("No Data Yet")
+
+# NOZZLE REPORT
+st.subheader("Nozzle Wise Sales")
+
+if not df.empty:
+
+    nozzle_report = df.groupby("Nozzle")["Litres"].sum().reset_index()
+
+    nozzle_report.columns = ["Nozzle","Total Litres Sold"]
+
+    st.dataframe(nozzle_report,use_container_width=True)
