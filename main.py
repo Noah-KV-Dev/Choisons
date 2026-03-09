@@ -55,7 +55,6 @@ col1, col2 = st.columns(2)
 with col1:
     manager_name = "Manager Name"
     phone = "+91 8590304889"
-with col2:
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
    
 st.info(f"""
