@@ -46,9 +46,25 @@ background-color:#ff6f00;
 """,unsafe_allow_html=True)
 
 st.title("⛽ Choisons Petrol Pump Management System")
-st.text_input('''                                                                                                    Created by Nazeeh          
+# ---------------- MANAGER CONTACT ----------------
 
-''')
+st.subheader("👨‍💼 Manager Contact Details")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    manager_name = "Manager Name"
+    phone = "+91 8590304889"
+
+with col2:
+    email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
+   
+st.info(f"""
+Phone: {phone}
+
+Email: {email}
+""")                                         
+
 # ---------------- FUEL PRICES ----------------
 
 st.subheader("Fuel Prices")
