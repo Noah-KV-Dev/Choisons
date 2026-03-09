@@ -9,16 +9,23 @@ st.set_page_config(
     layout="wide"
 )
 
-# ORANGE THEME
+# THEME + FONT
 st.markdown("""
 <style>
 
-.stApp{
-background-color:#fff7ef;
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap');
+
+html, body, [class*="css"]  {
+    font-family: 'Lexend', sans-serif;
+    color: black;
 }
 
-h1,h2,h3{
-color:#ff6b00;
+.stApp{
+    background-color:#fff7ef;
+}
+
+h1,h2,h3,h4{
+color:black;
 }
 
 .stButton>button{
@@ -31,9 +38,12 @@ border-radius:8px;
 """, unsafe_allow_html=True)
 
 
-# LOGIN SESSION
+# SESSION STATES
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+
+if "staff_accounts" not in st.session_state:
+    st.session_state.staff_accounts = {"admin":"1234"}
 
 if "attendance" not in st.session_state:
     st.session_state.attendance = []
@@ -42,58 +52,94 @@ if "sales" not in st.session_state:
     st.session_state.sales = []
 
 
-# LOGIN PAGE
-if not st.session_state.logged_in:
+# AUTH MENU
+auth_menu = st.sidebar.selectbox(
+    "Account",
+    ["Login","Signup"]
+)
+
+# LOGIN
+if auth_menu == "Login" and not st.session_state.logged_in:
 
     st.title("⛽ Choisons Petrolium Private Limited")
     st.subheader("Staff Login")
 
     username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    password = st.text_input("Password",type="password")
 
     if st.button("Login"):
 
-        if username == "admin" and password == "1234":
+        if username in st.session_state.staff_accounts and \
+           st.session_state.staff_accounts[username]==password:
+
             st.session_state.logged_in = True
-            st.success("Login successful")
+            st.session_state.user = username
+
+            st.success(f"Welcome {username}")
             st.rerun()
 
         else:
             st.error("Invalid login")
 
-else:
+# SIGNUP
+elif auth_menu == "Signup" and not st.session_state.logged_in:
 
-    st.sidebar.success("Logged in")
+    st.title("Staff Signup")
+
+    new_user = st.text_input("Create Username")
+    new_pass = st.text_input("Create Password",type="password")
+
+    if st.button("Create Account"):
+
+        if new_user in st.session_state.staff_accounts:
+
+            st.warning("Username already exists")
+
+        else:
+
+            st.session_state.staff_accounts[new_user] = new_pass
+
+            st.success("Account created successfully")
+
+
+# DASHBOARD AFTER LOGIN
+if st.session_state.logged_in:
+
+    st.sidebar.success(f"Logged in as {st.session_state.user}")
 
     if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
+        st.session_state.logged_in=False
         st.rerun()
 
     menu = st.sidebar.selectbox(
         "Dashboard",
-        ["Home","Staff Attendance","Nozzle Sales Entry","Fuel Prices","Services","Contact"]
+        ["Home","Staff Attendance","Nozzle Sales","Fuel Prices","Cash Balance","Services","Contact"]
     )
 
+
 # HOME
-    if menu == "Home":
+    if menu=="Home":
 
         st.title("⛽ CHOISONS PETROLIUM PRIVATE LIMITED")
         st.success("24 Hour Fuel Service")
 
-        image_path = "choisons_pump.png"
+        image_path="choisons_pump.png"
 
         if os.path.exists(image_path):
-            st.image(image_path, use_container_width=True)
+            st.image(image_path,use_container_width=True)
+
+        st.write("HPCL Dealer | Quality Fuel | Trusted Service")
+
 
 # STAFF ATTENDANCE
-    elif menu == "Staff Attendance":
+    elif menu=="Staff Attendance":
 
-        st.header("Staff Attendance Register")
+        st.header("Staff Attendance")
 
         col1,col2,col3 = st.columns(3)
 
         with col1:
-            staff_name = st.text_input("Staff Name")
+            name = st.text_input("Staff Name")
 
         with col2:
             staff_id = st.text_input("Staff ID")
@@ -105,22 +151,22 @@ else:
 
             st.session_state.attendance.append({
                 "Date":date.today(),
-                "Name":staff_name,
+                "Name":name,
                 "Staff ID":staff_id,
                 "Shift":shift
             })
 
-            st.success("Attendance recorded")
+            st.success("Attendance saved")
 
         if st.session_state.attendance:
 
             df = pd.DataFrame(st.session_state.attendance)
 
-            st.subheader("Attendance List")
             st.dataframe(df,use_container_width=True)
 
-# NOZZLE SALES ENTRY
-    elif menu == "Nozzle Sales Entry":
+
+# NOZZLE SALES
+    elif menu=="Nozzle Sales":
 
         st.header("Nozzle Sales Entry")
 
@@ -129,7 +175,7 @@ else:
         with col1:
             nozzle = st.selectbox(
                 "Nozzle",
-                ["Petrol Nozzle 1","Petrol Nozzle 2","Diesel Nozzle 1","Diesel Nozzle 2"]
+                ["Petrol 1","Petrol 2","Diesel 1","Diesel 2"]
             )
 
         with col2:
@@ -138,9 +184,9 @@ else:
         with col3:
             closing = st.number_input("Closing Meter",0)
 
-        total_litres = closing - opening
+        litres = closing-opening
 
-        st.info(f"Total Litres Sold: {total_litres}")
+        st.info(f"Total Litres Sold: {litres}")
 
         if st.button("Save Sales"):
 
@@ -149,22 +195,22 @@ else:
                 "Nozzle":nozzle,
                 "Opening":opening,
                 "Closing":closing,
-                "Litres Sold":total_litres
+                "Litres":litres
             })
 
-            st.success("Sales entry saved")
+            st.success("Sales saved")
 
         if st.session_state.sales:
 
             df = pd.DataFrame(st.session_state.sales)
 
-            st.subheader("Nozzle Sales Report")
             st.dataframe(df,use_container_width=True)
 
-# FUEL PRICES
-    elif menu == "Fuel Prices":
 
-        st.header("Fuel Price Panel")
+# FUEL PRICES
+    elif menu=="Fuel Prices":
+
+        st.header("Fuel Prices")
 
         col1,col2 = st.columns(2)
 
@@ -177,8 +223,30 @@ else:
         st.success(f"Petrol ₹ {petrol}")
         st.success(f"Diesel ₹ {diesel}")
 
+
+# CASH BALANCE
+    elif menu=="Cash Balance":
+
+        st.header("Cash Counter")
+
+        col1,col2,col3 = st.columns(3)
+
+        with col1:
+            opening = st.number_input("Opening Cash ₹",0)
+
+        with col2:
+            sales = st.number_input("Cash Sales ₹",0)
+
+        with col3:
+            expense = st.number_input("Expenses ₹",0)
+
+        balance = opening+sales-expense
+
+        st.success(f"Closing Balance ₹ {balance}")
+
+
 # SERVICES
-    elif menu == "Services":
+    elif menu=="Services":
 
         st.header("Services")
 
@@ -196,8 +264,9 @@ else:
             st.write("• Credit Sales Available")
             st.write("• 24x7 Service")
 
+
 # CONTACT
-    elif menu == "Contact":
+    elif menu=="Contact":
 
         st.header("Contact")
 
