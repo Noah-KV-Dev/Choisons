@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(
     page_title="Choisons Petrol Pump",
@@ -7,7 +8,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Title
 st.title("⛽ CHOISONS PETROL PUMP")
 st.subheader("HPCL Dealer | Quality Fuel & Trusted Service")
 
@@ -21,13 +21,16 @@ if menu == "Home":
 
     st.header("Welcome to Choisons Petrol Pump")
 
-    # Add your image file here
-    st.image("choisons_pump.png", use_container_width=True)
+    image_path = "choisons_pump.png"
+
+    if os.path.exists(image_path):
+        st.image(image_path, use_container_width=True)
+    else:
+        st.warning("Petrol pump image not found. Please upload 'choisons_pump.png'.")
 
     st.markdown("""
     ### Our Fuel Station
 
-    We provide:
     - High Quality HP Petrol
     - Diesel Fuel
     - Lubricants
@@ -38,7 +41,7 @@ if menu == "Home":
 
     st.success("Open 24 Hours 🚗")
 
-# FUEL PRICE PAGE
+
 elif menu == "Fuel Prices":
 
     st.header("Today's Fuel Prices")
@@ -46,37 +49,36 @@ elif menu == "Fuel Prices":
     petrol = st.number_input("Petrol Price (₹)", value=105.00)
     diesel = st.number_input("Diesel Price (₹)", value=95.00)
 
-    st.write("### Current Rates")
     st.write(f"Petrol : ₹ {petrol}")
     st.write(f"Diesel : ₹ {diesel}")
 
-# SALES ENTRY PAGE
+
 elif menu == "Daily Sales Entry":
 
     st.header("Daily Sales Entry")
 
-    petrol_sales = st.number_input("Petrol Sales ₹", value=0)
-    diesel_sales = st.number_input("Diesel Sales ₹", value=0)
-    oil_sales = st.number_input("Oil Sales ₹", value=0)
+    petrol_sales = st.number_input("Petrol Sales ₹", 0)
+    diesel_sales = st.number_input("Diesel Sales ₹", 0)
+    oil_sales = st.number_input("Oil Sales ₹", 0)
 
-    total_sales = petrol_sales + diesel_sales + oil_sales
+    total = petrol_sales + diesel_sales + oil_sales
 
-    st.success(f"Total Sales ₹ {total_sales}")
+    st.success(f"Total Sales ₹ {total}")
 
-# CASH BALANCE PAGE
+
 elif menu == "Cash Balance":
 
     st.header("Cash Counter Balance")
 
-    opening_cash = st.number_input("Opening Cash ₹", value=0)
-    sales_cash = st.number_input("Cash Sales ₹", value=0)
-    expenses = st.number_input("Expenses ₹", value=0)
+    opening = st.number_input("Opening Cash ₹", 0)
+    sales = st.number_input("Cash Sales ₹", 0)
+    expense = st.number_input("Expenses ₹", 0)
 
-    balance = opening_cash + sales_cash - expenses
+    balance = opening + sales - expense
 
-    st.success(f"Closing Cash Balance ₹ {balance}")
+    st.success(f"Closing Balance ₹ {balance}")
 
-# SERVICES PAGE
+
 elif menu == "Services":
 
     st.header("Our Services")
@@ -86,11 +88,11 @@ elif menu == "Services":
     - Engine Oil
     - Free Air
     - Drinking Water
-    - UPI / Cash / Card Payment
+    - UPI / Cash / Card
     - Clean Restroom
     """)
 
-# CONTACT PAGE
+
 elif menu == "Contact":
 
     st.header("Contact Us")
@@ -100,10 +102,9 @@ elif menu == "Contact":
     st.write("📞 Phone: +91 8590304889")
     st.write("📧 Email: choisons@gmail.com")
 
-    # Map location
     map_data = pd.DataFrame({
-        'lat':[11.2588],
-        'lon':[75.7804]
+        "lat":[11.2588],
+        "lon":[75.7804]
     })
 
     st.map(map_data)
