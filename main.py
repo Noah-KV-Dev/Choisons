@@ -272,7 +272,7 @@ if st.session_state.logged_in:
 
         st.write("📍 Kannur Road, Calicut")
         st.write("📞 +91 8590304889")
-        st.write("📧 choisons@gmail.com")
+        st.write("📧 choisonscalicut@gmail.com")
 
         map_data = pd.DataFrame({
             "lat":[11.2588],
