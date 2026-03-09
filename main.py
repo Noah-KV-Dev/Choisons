@@ -1,105 +1,133 @@
-import streamlit as st
-import pandas as pd
+from kivy.app import App
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
 
-st.set_page_config(
-    page_title="Choisons Petrol Pump",
-    page_icon="⛽",
-    layout="wide"
-)
+KV = """
 
-# Header
-st.title("⛽ CHOISONS PETROL PUMP")
-st.subheader("HPCL Dealer | Quality Fuel & Trusted Service")
+ScreenManager:
+    HomeScreen:
+    ApplyScreen:
+    ContactScreen:
 
-menu = st.sidebar.selectbox(
-    "Navigation",
-    ["Home", "Fuel Prices", "Daily Sales Entry", "Cash Balance", "Services", "Contact"]
-)
+<HomeScreen>:
+    name: "home"
 
-# HOME PAGE
-if menu == "Home":
+    FloatLayout:
 
-    st.image("https://images.unsplash.com/photos/rrUuQb4_7f4", use_column_width=True)
+        Image:
+            source: "hpcl_bg.jpg"
+            allow_stretch: True
+            keep_ratio: False
 
-    st.markdown("""
-    ### Welcome to Choisons Petrol Pump
+        BoxLayout:
+            orientation: "vertical"
+            size_hint: .9,.6
+            pos_hint: {"center_x":.5,"center_y":.5}
+            spacing: 20
 
-    We provide:
-    - High Quality HP Petrol
-    - Diesel Fuel
-    - Lubricants
-    - Air & Water Service
-    - Fast Billing
-    - Friendly Staff
-    """)
+            Label:
+                text: "Hindustan Petroleum"
+                font_size: 32
+                bold: True
+                color: 1,1,1,1
 
-    st.success("Open 24 Hours 🚗")
+            Label:
+                text: "HPCL Choices Application Portal"
+                font_size: 20
+                color: 1,1,1,1
 
-# FUEL PRICE PAGE
-elif menu == "Fuel Prices":
+            Button:
+                text: "Apply Now"
+                size_hint_y: None
+                height: 60
+                on_press: app.root.current = "apply"
 
-    st.header("Today's Fuel Prices")
+            Button:
+                text: "Contact Us"
+                size_hint_y: None
+                height: 60
+                on_press: app.root.current = "contact"
 
-    petrol = st.number_input("Petrol Price (₹)", value=105.00)
-    diesel = st.number_input("Diesel Price (₹)", value=95.00)
 
-    st.write("### Current Rates")
-    st.write(f"Petrol : ₹ {petrol}")
-    st.write(f"Diesel : ₹ {diesel}")
+<ApplyScreen>:
+    name: "apply"
 
-# SALES ENTRY PAGE
-elif menu == "Daily Sales Entry":
+    BoxLayout:
+        orientation: "vertical"
+        padding: 20
+        spacing: 15
 
-    st.header("Daily Sales Entry")
+        Label:
+            text: "Application Form"
+            font_size: 24
 
-    petrol_sales = st.number_input("Petrol Sales ₹")
-    diesel_sales = st.number_input("Diesel Sales ₹")
-    oil_sales = st.number_input("Oil Sales ₹")
+        TextInput:
+            hint_text: "Full Name"
 
-    total_sales = petrol_sales + diesel_sales + oil_sales
+        TextInput:
+            hint_text: "Phone Number"
 
-    st.write("### Total Sales")
-    st.success(f"₹ {total_sales}")
+        TextInput:
+            hint_text: "Email"
 
-# CASH BALANCE PAGE
-elif menu == "Cash Balance":
+        TextInput:
+            hint_text: "Address"
 
-    st.header("Cash Counter Balance")
+        Button:
+            text: "Submit Application"
 
-    opening_cash = st.number_input("Opening Cash ₹")
-    sales_cash = st.number_input("Cash Sales ₹")
-    expenses = st.number_input("Expenses ₹")
+        Button:
+            text: "Back"
+            on_press: app.root.current = "home"
 
-    balance = opening_cash + sales_cash - expenses
 
-    st.write("### Closing Cash Balance")
-    st.success(f"₹ {balance}")
+<ContactScreen>:
+    name: "contact"
 
-# SERVICES PAGE
-elif menu == "Services":
+    BoxLayout:
+        orientation: "vertical"
+        padding: 20
+        spacing: 15
 
-    st.header("Our Services")
+        Label:
+            text: "Contact Us"
+            font_size: 24
 
-    st.markdown("""
-    - Petrol & Diesel
-    - Engine Oil
-    - Free Air
-    - Drinking Water
-    - Fast Payment (UPI / Cash / Card)
-    - Clean Restroom
-    """)
+        TextInput:
+            hint_text: "Your Name"
 
-# CONTACT PAGE
-elif menu == "Contact":
+        TextInput:
+            hint_text: "Your Email"
 
-    st.header("Contact Us")
+        TextInput:
+            hint_text: "Message"
+            multiline: True
 
-    st.write("📍 Choisons Petrol Pump")
-    st.write("Kannur Road, Calicut")
-    st.write("📞 Phone: +91 8590304889")
-    st.write("📧 Email: choisonscalicut@gmail.com")
+        Button:
+            text: "Send Message"
 
-    st.map(pd.DataFrame({
-        'lat':[11.2588],
-        'lon':[75.7804]
-    }))
+        Button:
+            text: "Back"
+            on_press: app.root.current = "home"
+
+"""
+
+
+class HomeScreen(Screen):
+    pass
+
+
+class ApplyScreen(Screen):
+    pass
+
+
+class ContactScreen(Screen):
+    pass
+
+
+class HPCLApp(App):
+    def build(self):
+        return Builder.load_string(KV)
+
+
+HPCLApp().run()
