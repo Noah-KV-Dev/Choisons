@@ -204,68 +204,6 @@ st.subheader("Sales Records")
 
 st.dataframe(df,use_container_width=True)
 
-# ---------------- ADMIN EDIT RECORD ----------------
-
-if st.session_state.admin_logged:
-
-    st.subheader("✏ Admin Edit Record")
-
-    if not df.empty:
-
-        edit_id = st.selectbox("Select Record ID to Edit", df["rowid"])
-
-        record = df[df["rowid"] == edit_id].iloc[0]
-
-        new_staff = st.text_input("Staff Name", record["staff"])
-
-        new_fuel = st.selectbox(
-            "Fuel Type",
-            ["Petrol","Diesel","Power Petrol"],
-            index=["Petrol","Diesel","Power Petrol"].index(record["fuel"])
-        )
-
-        new_nozzle = st.selectbox(
-            "Nozzle",
-            ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-             "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"],
-            index=[
-                "Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-                "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"
-            ].index(record["nozzle"])
-        )
-
-        new_opening = st.number_input("Opening Metre", value=float(record["opening"]))
-        new_closing = st.number_input("Closing Metre", value=float(record["closing"]))
-
-        new_litres = new_closing - new_opening
-        if new_litres < 0:
-            new_litres = 0
-
-        new_price = record["price"]
-        new_total = new_litres * new_price
-
-        if st.button("Update Record"):
-
-            cursor.execute("""
-            UPDATE sales
-            SET staff=?, fuel=?, nozzle=?, opening=?, closing=?, litres=?, total=?
-            WHERE rowid=?
-            """,
-            (
-                new_staff,
-                new_fuel,
-                new_nozzle,
-                new_opening,
-                new_closing,
-                new_litres,
-                new_total,
-                edit_id
-            ))
-
-            conn.commit()
-
-            st.success("Record Updated Successfully")
-            st.rerun()
 
 
 # ---------------- DAILY SALES ----------------
