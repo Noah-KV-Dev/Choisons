@@ -46,7 +46,9 @@ background-color:#ff6f00;
 """,unsafe_allow_html=True)
 
 st.title("⛽ Choisons Petrol Pump Management System")
-st.text_input("                                                                                                    Created by Nazeeh")
+st.text_input('''                                                                                                    Created by Nazeeh          
+
+''')
 # ---------------- FUEL PRICES ----------------
 
 st.subheader("Fuel Prices")
