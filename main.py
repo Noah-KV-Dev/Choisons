@@ -79,7 +79,9 @@ with col1:
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
 st.info(f'''
 **Contact Details**
-Phone: {phone}
+
+
+Phone: {phone}\n
 Email: {email}
 Created by Nazeeh
 )                                         
