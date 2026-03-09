@@ -84,7 +84,7 @@ st.info(f'''
 Phone: {phone}\n
 Email: {email}
 Created by Nazeeh
-)                                         
+''')                                         
 
 # ---------------- FUEL PRICES ----------------
 
