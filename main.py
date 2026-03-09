@@ -77,13 +77,12 @@ col1, col2 = st.columns(2)
 with col1:
     phone = "+91 8590304889"
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
-st.info(f"""
+st.info(f'''
 **Contact Details**
-
 Phone: {phone}
-Email: {email}\n 
+Email: {email}
 Created by Nazeeh
-""")                                         
+)                                         
 
 # ---------------- FUEL PRICES ----------------
 
