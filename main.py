@@ -55,7 +55,7 @@ with col1:
     phone = "+91 8590304889"
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
 st.info(f"""
-{'\033{0m'}Contact Details{'\033{0m'}
+**Contact Details**
 
 Phone: {phone}
 Email: {email}\n 
