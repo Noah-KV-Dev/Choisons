@@ -56,8 +56,7 @@ with col1:
     email = "kvpnaseeh@gmail.com\n choisonscalicut@gmail.com"
 st.info(f"""
 Phone: {phone}
-Email: {email}
-Created by Nazeeh
+Email: {email}\n Created by Nazeeh
 """)                                         
 
 # ---------------- FUEL PRICES ----------------
