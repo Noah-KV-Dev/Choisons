@@ -1,133 +1,44 @@
-from kivy.app import App
-from kivy.lang import Builder
-from kivy.uix.screenmanager import ScreenManager, Screen
+import streamlit as st
 
-KV = """
+# Page config
+st.set_page_config(page_title="HPCL Choices", layout="centered")
 
-ScreenManager:
-    HomeScreen:
-    ApplyScreen:
-    ContactScreen:
+# Title
+st.title("Hindustan Petroleum Choices Application")
 
-<HomeScreen>:
-    name: "home"
+# Image
+st.image("https://images.unsplash.com/photo-rrUuQb4_7f4", use_column_width=True)
 
-    FloatLayout:
+# Navigation
+menu = st.sidebar.selectbox(
+    "Menu",
+    ["Home", "Apply", "Contact"]
+)
 
-        Image:
-            source: "hpcl_bg.jpg"
-            allow_stretch: True
-            keep_ratio: False
+# Home Page
+if menu == "Home":
+    st.header("Welcome")
+    st.write("Welcome to the HPCL Choices application portal.")
 
-        BoxLayout:
-            orientation: "vertical"
-            size_hint: .9,.6
-            pos_hint: {"center_x":.5,"center_y":.5}
-            spacing: 20
+# Apply Page
+elif menu == "Apply":
+    st.header("Application Form")
 
-            Label:
-                text: "Hindustan Petroleum"
-                font_size: 32
-                bold: True
-                color: 1,1,1,1
+    name = st.text_input("Full Name")
+    phone = st.text_input("Phone Number")
+    email = st.text_input("Email")
+    address = st.text_area("Address")
 
-            Label:
-                text: "HPCL Choices Application Portal"
-                font_size: 20
-                color: 1,1,1,1
+    if st.button("Submit Application"):
+        st.success("Application submitted successfully!")
 
-            Button:
-                text: "Apply Now"
-                size_hint_y: None
-                height: 60
-                on_press: app.root.current = "apply"
+# Contact Page
+elif menu == "Contact":
+    st.header("Contact Us")
 
-            Button:
-                text: "Contact Us"
-                size_hint_y: None
-                height: 60
-                on_press: app.root.current = "contact"
+    cname = st.text_input("Your Name")
+    cemail = st.text_input("Your Email")
+    message = st.text_area("Message")
 
-
-<ApplyScreen>:
-    name: "apply"
-
-    BoxLayout:
-        orientation: "vertical"
-        padding: 20
-        spacing: 15
-
-        Label:
-            text: "Application Form"
-            font_size: 24
-
-        TextInput:
-            hint_text: "Full Name"
-
-        TextInput:
-            hint_text: "Phone Number"
-
-        TextInput:
-            hint_text: "Email"
-
-        TextInput:
-            hint_text: "Address"
-
-        Button:
-            text: "Submit Application"
-
-        Button:
-            text: "Back"
-            on_press: app.root.current = "home"
-
-
-<ContactScreen>:
-    name: "contact"
-
-    BoxLayout:
-        orientation: "vertical"
-        padding: 20
-        spacing: 15
-
-        Label:
-            text: "Contact Us"
-            font_size: 24
-
-        TextInput:
-            hint_text: "Your Name"
-
-        TextInput:
-            hint_text: "Your Email"
-
-        TextInput:
-            hint_text: "Message"
-            multiline: True
-
-        Button:
-            text: "Send Message"
-
-        Button:
-            text: "Back"
-            on_press: app.root.current = "home"
-
-"""
-
-
-class HomeScreen(Screen):
-    pass
-
-
-class ApplyScreen(Screen):
-    pass
-
-
-class ContactScreen(Screen):
-    pass
-
-
-class HPCLApp(App):
-    def build(self):
-        return Builder.load_string(KV)
-
-
-HPCLApp().run()
+    if st.button("Send Message"):
+        st.success("Message sent successfully!")
