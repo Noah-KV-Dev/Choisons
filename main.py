@@ -48,7 +48,7 @@ background-color:#ff6f00;
 st.title("⛽ Choisons Petrol Pump Management System")
 # ---------------- MANAGER CONTACT ----------------
 
-st.text(" Contact Details")
+st.text_input("Contact Details")
 
 col1 = st.columns(1)
 with col1:
