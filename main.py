@@ -81,8 +81,8 @@ with col1:
 st.info(f'''
 **Contact Details**
 Phone: {phone}\n
-Email: {email}
-Email: {email2}
+Email: {email}\n
+Email: {email2}\n
 Created by Nazeeh
 ''')                                         
 
