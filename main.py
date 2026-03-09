@@ -19,7 +19,7 @@ menu = st.sidebar.selectbox(
 # HOME PAGE
 if menu == "Home":
 
-    st.image("https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6", use_column_width=True)
+    st.image("https://images.unsplash.com/photos/rrUuQb4_7f4", use_column_width=True)
 
     st.markdown("""
     ### Welcome to Choisons Petrol Pump
