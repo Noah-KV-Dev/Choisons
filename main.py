@@ -20,18 +20,26 @@ html, body, [class*="css"]  {
     color: black;
 }
 
+/* MAIN BACKGROUND */
 .stApp{
-    background-color:#fff7ef;
+    background-color:#ff6b00;
 }
 
-h1,h2,h3,h4{
-color:black;
+/* TEXT */
+h1,h2,h3,h4,h5,p,span,label{
+    color:black;
 }
 
+/* BUTTON STYLE */
 .stButton>button{
-background-color:#ff6b00;
-color:white;
-border-radius:8px;
+    background-color:black;
+    color:white;
+    border-radius:8px;
+}
+
+/* SIDEBAR */
+section[data-testid="stSidebar"]{
+    background-color:#ff8c42;
 }
 
 </style>
@@ -52,11 +60,12 @@ if "sales" not in st.session_state:
     st.session_state.sales = []
 
 
-# AUTH MENU
+# LOGIN / SIGNUP MENU
 auth_menu = st.sidebar.selectbox(
     "Account",
     ["Login","Signup"]
 )
+
 
 # LOGIN
 if auth_menu == "Login" and not st.session_state.logged_in:
@@ -80,6 +89,7 @@ if auth_menu == "Login" and not st.session_state.logged_in:
 
         else:
             st.error("Invalid login")
+
 
 # SIGNUP
 elif auth_menu == "Signup" and not st.session_state.logged_in:
@@ -272,7 +282,7 @@ if st.session_state.logged_in:
 
         st.write("📍 Kannur Road, Calicut")
         st.write("📞 +91 8590304889")
-        st.write("📧 choisonscalicut@gmail.com")
+        st.write("📧 choisons@gmail.com")
 
         map_data = pd.DataFrame({
             "lat":[11.2588],
