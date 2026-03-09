@@ -51,7 +51,6 @@ st.title("⛽ Choisons Petrol Pump Management System")
 st.subheader(" Contact Details")
 
 col1, col2 = st.columns(2)
-
 with col1:
     manager_name = "Manager Name"
     phone = "+91 8590304889"
