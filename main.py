@@ -48,7 +48,7 @@ background-color:#ff6f00;
 st.title("⛽ Choisons Petrol Pump Management System")
 # ---------------- MANAGER CONTACT ----------------
 
-st.subheader("👨‍💼 Manager Contact Details")
+st.subheader("👨‍💼 Contact Details")
 
 col1, col2 = st.columns(2)
 
