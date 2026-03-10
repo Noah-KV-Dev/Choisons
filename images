@@ -1,0 +1,7 @@
+bharath-industrial
+│
+├── main.py
+├── requirements.txt
+└── images
+     ├── welding_work.jpg
+     └── hen_cage.jpg
