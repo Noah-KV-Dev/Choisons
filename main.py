@@ -1,14 +1,11 @@
 import streamlit as st
 
-# Page Config
-st.set_page_config(
-    page_title="Bharath Industrial | Welding Works",import streamlit as st
-
 st.set_page_config(page_title="Bharath Industrial", layout="wide")
 
-# Custom CSS
+# CSS must be inside a string
 st.markdown("""
 <style>
+
 .header{
 background:#1877f2;
 color:white;
@@ -24,6 +21,20 @@ border-radius:10px;
 box-shadow:0 0 5px rgba(0,0,0,0.1);
 margin-bottom:20px;
 }
+
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="header">Bharath Industrial | 📞 7902984770</div>', unsafe_allow_html=True)
+
+menu = st.sidebar.selectbox(
+"Navigation",
+["Home","Price List","Hen Cage Welding","Welder Vacancy","Contact"]
+)
+
+if menu == "Home":
+    st.header("Bharath Industrial Welding Works")
+    st.write("Professional industrial welding and fabrication works.")
 </style>
 """, unsafe_allow_html=True)
 
