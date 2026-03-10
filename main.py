@@ -1,27 +1,17 @@
 import streamlit as st
 
-st.set_page_config(page_title="Bharath Industrial", layout="wide")
-
-# CSS must be inside a string
 st.markdown("""
 <style>
-
 .header{
 background:#1877f2;
 color:white;
 padding:15px;
 font-size:24px;
-font-weight:bold;
 }
+</style>
+""", unsafe_allow_html=True)
 
-.card{
-background:white;
-padding:20px;
-border-radius:10px;
-box-shadow:0 0 5px rgba(0,0,0,0.1);
-margin-bottom:20px;
-}
-
+st.markdown('<div class="header">Bharath Industrial</div>', unsafe_allow_html=True)
 </style>
 """, unsafe_allow_html=True)
 
