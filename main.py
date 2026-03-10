@@ -1,264 +1,127 @@
 import streamlit as st
-import sqlite3
-import pandas as pd
-from datetime import date, datetime, time
 
-# ---------------- DATABASE ----------------
-conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
-cursor = conn.cursor()
-
-# Sales Table
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS sales(
-date TEXT,
-staff TEXT,
-fuel TEXT,
-nozzle TEXT,
-opening REAL,
-closing REAL,
-litres REAL,
-price REAL,
-total REAL,
-duty_in TEXT,
-duty_out TEXT,
-hours REAL
+# Page Config
+st.set_page_config(
+    page_title="Bharath Industrial | Welding Works",
+    layout="wide"
 )
-""")
 
-# Staff Table
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS staff(
-name TEXT PRIMARY KEY
+# Header
+st.title("🔧 Bharath Industrial Welding Works")
+st.markdown("📞 **Contact:** 7902984770")
+
+# Sidebar Navigation
+menu = st.sidebar.radio(
+    "Navigation",
+    ["Home", "Price List", "Hen Cage Welding", "Welder Vacancy", "Contact"]
 )
-""")
-conn.commit()
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+# ---------------- HOME ----------------
+if menu == "Home":
 
-# ---------------- STYLE ----------------
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
+    st.header("Bharath Industrial Welding Works")
 
-html,body,[class*="css"]{
-font-family:'Lexend',sans-serif;
-color:black;
-}
+    st.write(
+        "Professional industrial welding, contract works, sheet installation "
+        "and site welding services."
+    )
 
-.stApp{
-background-color:#ff6f00;
-}
-</style>
-""", unsafe_allow_html=True)
+    st.image(
+        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc",
+        use_column_width=True
+    )
 
-st.title("⛽ Choisons Petrol Pump Management System")
+    # Comment system
+    st.subheader("Comments")
 
-# ---------------- ADMIN LOGIN ----------------
-st.sidebar.title("Admin Panel")
+    if "comments" not in st.session_state:
+        st.session_state.comments = []
 
-admin_user = "admin"
-admin_pass = "admin123"
+    comment = st.text_input("Write a comment")
 
-if "admin_logged" not in st.session_state:
-    st.session_state.admin_logged = False
+    if st.button("Post Comment"):
+        if comment:
+            st.session_state.comments.append(comment)
 
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
+    for c in st.session_state.comments:
+        st.write("💬", c)
 
-if st.sidebar.button("Login"):
-    if username == admin_user and password == admin_pass:
-        st.session_state.admin_logged = True
-        st.sidebar.success("Admin Logged In")
-    else:
-        st.sidebar.error("Invalid Login")
 
-if st.session_state.admin_logged:
-    st.sidebar.success("Admin Mode Active")
+# ---------------- PRICE LIST ----------------
+elif menu == "Price List":
 
-# ---------------- MANAGER CONTACT ----------------
-col1, col2 = st.columns(2)
-with col1:
-    phone = "+91 8590304889"
-    email = "kvpnaseeh@gmail.com"
-    email2 = "choisonscalicut@gmail.com"
-st.info(f'''
-**Contact Details**
-Phone: {phone}\n
-Email: {email}\n
-Email: {email2}\n
-Created by Nazeeh
-''')                                         
+    st.header("Industrial Work Price List")
 
-# ---------------- FUEL PRICES ----------------
-st.subheader("Fuel Prices")
+    data = {
+        "Work Type": [
+            "Contract Welding Work",
+            "Sheet Installation",
+            "Industrial Fabrication",
+            "Site Welding Works",
+            "Station Welding Works"
+        ],
+        "Price": [
+            "₹1500 / Day",
+            "₹120 / sq.ft",
+            "₹2000 / Project",
+            "₹1800 / Day",
+            "₹1600 / Day"
+        ]
+    }
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    petrol_price = st.number_input("Petrol Price", value=105.76)
-with col2:
-    diesel_price = st.number_input("Diesel Price", value=94.76)
-with col3:
-    power_price = st.number_input("Power Petrol Price", value=113.66)
+    st.table(data)
 
-# ---------------- STAFF DUTY ----------------
-st.subheader("Staff Duty Time")
 
-col4, col5 = st.columns(2)
-with col4:
-    duty_in = st.time_input("Duty IN")
-with col5:
-    duty_out = st.time_input("Duty OUT")
+# ---------------- HEN CAGE ----------------
+elif menu == "Hen Cage Welding":
 
-# CALCULATE HOURS
-in_time = datetime.combine(date.today(), duty_in)
-out_time = datetime.combine(date.today(), duty_out)
-hours = (out_time - in_time).total_seconds() / 3600
-if hours < 0:
-    hours = 0
-st.info(f"Work Hours: {round(hours, 2)} hrs")
+    st.header("Hen Cage Welding Works")
 
-# ---------------- SALES ENTRY ----------------
-st.subheader("Sales Entry")
-col6, col7, col8 = st.columns(3)
+    st.write(
+        "We manufacture strong and durable poultry cages for farms "
+        "and commercial poultry businesses."
+    )
 
-# Fetch staff from staff table
-staff_list = [row[0] for row in cursor.execute("SELECT name FROM staff").fetchall()]
-with col6:
-    if staff_list:
-        staff = st.selectbox("Staff Name", staff_list)
-    else:
-        staff = st.text_input("Staff Name (Add staff in Admin Panel first)")
-with col7:
-    entry_date = st.date_input("Date", date.today())
-with col8:
-    fuel = st.selectbox("Fuel Type", ["Petrol", "Diesel", "Power Petrol"])
+    st.image(
+        "https://images.unsplash.com/photo-1598514982849-6e23b8c2a52b",
+        use_column_width=True
+    )
 
-# NOZZLE
-nozzle = st.selectbox("Nozzle", [
-    "Nozzle 1", "Nozzle 2", "Nozzle 3", "Nozzle 4", "Nozzle 5",
-    "Nozzle 6", "Nozzle 7", "Nozzle 8", "Nozzle 9", "Nozzle 10"
-])
+    st.markdown("""
+    - Heavy duty iron cages  
+    - Long life welding  
+    - Custom sizes available  
+    - Farm installation support
+    """)
 
-# METRE
-col9, col10 = st.columns(2)
-with col9:
-    opening = st.number_input("Opening Metre")
-with col10:
-    closing = st.number_input("Closing Metre")
 
-# LITRE CALCULATION
-litres = closing - opening
-if litres < 0:
-    litres = 0
+# ---------------- JOB VACANCY ----------------
+elif menu == "Welder Vacancy":
 
-# PRICE
-if fuel == "Petrol":
-    price = petrol_price
-elif fuel == "Diesel":
-    price = diesel_price
-else:
-    price = power_price
+    st.header("Welder Job Vacancy")
 
-# TOTAL
-total = litres * price
+    st.info("""
+    **Position:** Industrial Welder  
 
-st.success(f"Litres Sold: {round(litres, 2)} L")
-st.success(f"Total Sale: ₹ {round(total, 2)}")
+    **Experience:** 1-3 Years  
 
-# SAVE ENTRY
-if st.button("Save Entry"):
-    if staff.strip() == "":
-        st.error("Please select or add a staff")
-    else:
-        cursor.execute("""
-        INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-            str(entry_date),
-            staff,
-            fuel,
-            nozzle,
-            opening,
-            closing,
-            litres,
-            price,
-            total,
-            str(duty_in),
-            str(duty_out),
-            hours
-        ))
-        conn.commit()
-        st.success("Data Saved")
+    **Location:** Site / Workshop  
 
-# ---------------- DATA TABLE ----------------
-df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-st.subheader("Sales Records")
-st.dataframe(df, use_container_width=True)
+    **Salary:** Negotiable
+    """)
 
-# ---------------- DAILY SALES ----------------
-st.subheader("Daily Sales Summary")
-today = str(date.today())
-today_data = df[df["date"] == today]
-st.metric("Litres Today", round(today_data["litres"].sum(), 2))
-st.metric("Sales Today", round(today_data["total"].sum(), 2))
+    st.success("📞 Interested candidates contact: 7902984770")
 
-# ---------------- ADMIN DELETE CONTROL ----------------
-if st.session_state.admin_logged:
-    st.subheader("⚠ Admin Controls")
-    if not df.empty:
-        record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
-        if st.button("Delete Selected Record"):
-            cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
-            conn.commit()
-            st.warning("Record Deleted")
-            st.experimental_rerun()
 
-        if st.button("Delete All Data"):
-            cursor.execute("DELETE FROM sales")
-            conn.commit()
-            st.error("All Data Deleted")
-            st.experimental_rerun()
+# ---------------- CONTACT ----------------
+elif menu == "Contact":
 
-# ---------------- MONTHLY STAFF LITRES ----------------
-st.subheader("Monthly Litre Sales Per Staff")
-staff_litres = df.groupby("staff")["litres"].sum().reset_index()
-st.dataframe(staff_litres)
+    st.header("Contact Bharath Industrial")
 
-# ---------------- MONTHLY STAFF HOURS ----------------
-st.subheader("Monthly Staff Working Hours")
-staff_hours = df.groupby("staff")["hours"].sum().reset_index()
-st.dataframe(staff_hours)
+    st.write(
+        "For welding works, industrial fabrication and poultry cage welding."
+    )
 
-# ---------------- NOZZLE SALES ----------------
-st.subheader("Nozzle Sales")
-nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
-st.dataframe(nozzle_sales)
+    st.write("📞 Phone: 7902984770")
 
-# ---------------- ADMIN STAFF MANAGEMENT ----------------
-if st.session_state.admin_logged:
-    st.subheader("👥 Staff Management")
-
-    # Fetch staff list
-    staff_list = [row[0] for row in cursor.execute("SELECT name FROM staff").fetchall()]
-
-    # Add new staff
-    new_staff = st.text_input("Add New Staff")
-    if st.button("Add Staff"):
-        if new_staff.strip() == "":
-            st.error("Staff name cannot be empty")
-        elif new_staff in staff_list:
-            st.warning("Staff already exists")
-        else:
-            cursor.execute("INSERT INTO staff VALUES (?)", (new_staff,))
-            conn.commit()
-            st.success(f"Staff '{new_staff}' added")
-            st.experimental_rerun()
-
-    # Remove staff
-    if staff_list:
-        remove_staff = st.selectbox("Remove Staff", staff_list)
-        if st.button("Remove Staff"):
-            cursor.execute("DELETE FROM staff WHERE name = ?", (remove_staff,))
-            conn.commit()
-            st.warning(f"Staff '{remove_staff}' removed")
-            st.experimental_rerun()
+    st.map()
