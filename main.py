@@ -19,8 +19,7 @@ background:white;
 padding:20px;
 border-radius:10px;
 box-shadow:0 0 5px rgba(0,0,0,0.1);
-"""margin-bottom:20px;
-}
+""", margin-bottom:20px;)
 
 </style>
 """, unsafe_allow_html=True)
