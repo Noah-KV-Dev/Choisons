@@ -2,7 +2,138 @@ import streamlit as st
 
 # Page Config
 st.set_page_config(
-    page_title="Bharath Industrial | Welding Works",
+    page_title="Bharath Industrial | Welding Works",import streamlit as st
+
+st.set_page_config(page_title="Bharath Industrial", layout="wide")
+
+# Custom CSS
+st.markdown("""
+<style>
+.header{
+background:#1877f2;
+color:white;
+padding:15px;
+font-size:24px;
+font-weight:bold;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 5px rgba(0,0,0,0.1);
+margin-bottom:20px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown('<div class="header">Bharath Industrial | 📞 7902984770</div>', unsafe_allow_html=True)
+
+# Sidebar
+menu = st.sidebar.selectbox(
+"Navigation",
+["Home","Price List","Hen Cage Welding","Welder Vacancy","Contact"]
+)
+
+# HOME
+if menu == "Home":
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.header("Bharath Industrial Welding Works")
+
+    st.write(
+        "Professional industrial welding, contract works, "
+        "sheet installation and site works."
+    )
+
+    st.image(
+        "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc",
+        use_column_width=True
+    )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# PRICE LIST
+elif menu == "Price List":
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.header("Industrial Work Price List")
+
+    st.table({
+        "Work Type":[
+            "Contract Welding Work",
+            "Sheet Installation",
+            "Industrial Fabrication",
+            "Site Welding Works",
+            "Station Welding Works"
+        ],
+        "Price":[
+            "₹1500 / Day",
+            "₹120 / sq.ft",
+            "₹2000 / Project",
+            "₹1800 / Day",
+            "₹1600 / Day"
+        ]
+    })
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# HEN CAGE
+elif menu == "Hen Cage Welding":
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.header("Hen Cage Welding Works")
+
+    st.write(
+        "We manufacture strong and durable poultry cages "
+        "for farms and commercial poultry businesses."
+    )
+
+    st.image(
+        "https://images.unsplash.com/photo-1598514982849-6e23b8c2a52b",
+        use_column_width=True
+    )
+
+    st.markdown("""
+- Heavy duty iron cages
+- Long life welding
+- Custom sizes available
+- Farm installation support
+""")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# JOB
+elif menu == "Welder Vacancy":
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.header("Welder Job Vacancy")
+
+    st.write("**Position:** Industrial Welder")
+    st.write("**Experience:** 1-3 Years")
+    st.write("**Location:** Site / Workshop")
+    st.write("**Salary:** Negotiable")
+
+    st.success("📞 Contact: 7902984770")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# CONTACT
+elif menu == "Contact":
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    st.header("Contact Bharath Industrial")
+
+    st.write("📞 Phone: 7902984770")
+    st.write("Industrial welding, fabrication and poultry cage works.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
     layout="wide"
 )
 
