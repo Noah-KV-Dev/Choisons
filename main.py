@@ -93,13 +93,13 @@ st.subheader("Fuel Prices")
 col1,col2,col3 = st.columns(3)
 
 with col1:
-    petrol_price = st.number_input("Petrol Price",value=100.0)
+    petrol_price = st.number_input("Petrol Price",value=105.76)
 
 with col2:
-    diesel_price = st.number_input("Diesel Price",value=90.0)
+    diesel_price = st.number_input("Diesel Price",value=.94.76)
 
 with col3:
-    power_price = st.number_input("Power Petrol Price",value=105.0)
+    power_price = st.number_input("Power Petrol Price",value=113.66)
 
 # ---------------- STAFF DUTY ----------------
 
