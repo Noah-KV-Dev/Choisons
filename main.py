@@ -96,7 +96,7 @@ with col1:
     petrol_price = st.number_input("Petrol Price",value=105.76)
 
 with col2:
-    diesel_price = st.number_input("Diesel Price",value=.94.76)
+    diesel_price = st.number_input("Diesel Price",value=94.76)
 
 with col3:
     power_price = st.number_input("Power Petrol Price",value=113.66)
