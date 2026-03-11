@@ -40,53 +40,32 @@ price REAL
 
 conn.commit()
 
-# ---------------- DEFAULT DATA ----------------
+# ---------------- DEFAULT PRICE ----------------
 
 cursor.execute("SELECT COUNT(*) FROM fuel_price")
 if cursor.fetchone()[0] == 0:
+
     cursor.execute("INSERT INTO fuel_price VALUES('Petrol',100)")
     cursor.execute("INSERT INTO fuel_price VALUES('Diesel',90)")
     cursor.execute("INSERT INTO fuel_price VALUES('Power Petrol',105)")
+
     conn.commit()
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------- PAGE ----------------
 
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-
-# ---------------- STYLE ----------------
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
-html,body,[class*="css"]{
-font-family:'Lexend',sans-serif;
-color:black;
-}
-.stApp{
-background-color:#ff6f00;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ---------------- TITLE ----------------
 
 st.title("⛽ Choisons Petrol Pump Management System")
 
 # ---------------- CONTACT ----------------
 
-phone = "+91 8590304889"
-email = "kvpnaseeh@gmail.com\nchoisonscalicut@gmail.com"
-
-st.info(f"""
-**Contact Details**
-
-Phone: {phone}  
-Email: {email}  
-
+st.info("""
+Phone: +91 8590304889  
+Email: kvpnaseeh@gmail.com  
 Created by Nazeeh
 """)
 
-# ---------------- LOAD DATABASE DATA ----------------
+# ---------------- LOAD DATA ----------------
 
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 staff_df = pd.read_sql("SELECT * FROM staff", conn)
@@ -94,6 +73,35 @@ price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
 
 price_dict = dict(zip(price_df["fuel"], price_df["price"]))
 staff_list = staff_df["name"].tolist()
+
+# ---------------- STAFF PRICE CHANGE ----------------
+
+st.subheader("Fuel Price Update")
+
+colp1,colp2,colp3 = st.columns(3)
+
+with colp1:
+    fuel_change = st.selectbox(
+        "Fuel Type",
+        ["Petrol","Diesel","Power Petrol"]
+    )
+
+with colp2:
+    new_price = st.number_input("New Price")
+
+with colp3:
+    if st.button("Update Fuel Price"):
+
+        cursor.execute(
+        "UPDATE fuel_price SET price=? WHERE fuel=?",
+        (new_price,fuel_change)
+        )
+
+        conn.commit()
+
+        st.success("Fuel Price Updated")
+
+        st.rerun()
 
 # ---------------- STAFF DUTY ----------------
 
@@ -110,7 +118,7 @@ with col2:
 in_time = datetime.combine(date.today(), duty_in)
 out_time = datetime.combine(date.today(), duty_out)
 
-hours = (out_time - in_time).total_seconds() / 3600
+hours = (out_time - in_time).total_seconds()/3600
 
 if hours < 0:
     hours = 0
@@ -130,7 +138,7 @@ with col4:
     entry_date = st.date_input("Date", date.today())
 
 with col5:
-    fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+    fuel = st.selectbox("Fuel Type",["Petrol","Diesel","Power Petrol"])
 
 nozzle = st.selectbox("Nozzle",[
 "Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
@@ -148,12 +156,15 @@ params=(nozzle,)
 if len(last) > 0:
     default_opening = last.iloc[0]["closing"]
 else:
-    default_opening = 0.0
+    default_opening = 0
 
 col6,col7 = st.columns(2)
 
 with col6:
-    opening = st.number_input("Opening Metre", value=float(default_opening))
+    opening = st.number_input(
+        "Opening Metre",
+        value=float(default_opening)
+    )
 
 with col7:
     closing = st.number_input("Closing Metre")
@@ -205,7 +216,7 @@ st.subheader("Sales Records")
 
 st.dataframe(df, use_container_width=True)
 
-# ---------------- DAILY SALES ----------------
+# ---------------- DAILY SUMMARY ----------------
 
 st.subheader("Daily Sales Summary")
 
@@ -218,7 +229,7 @@ st.metric("Sales Today", round(today_data["total"].sum(),2))
 
 # ---------------- STAFF LITRES ----------------
 
-st.subheader("Monthly Litre Sales Per Staff")
+st.subheader("Staff Total Litres")
 
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 
@@ -226,7 +237,7 @@ st.dataframe(staff_litres)
 
 # ---------------- STAFF HOURS ----------------
 
-st.subheader("Monthly Staff Working Hours")
+st.subheader("Staff Total Hours")
 
 staff_hours = df.groupby("staff")["hours"].sum().reset_index()
 
@@ -271,13 +282,11 @@ if st.session_state.admin_logged:
         st.session_state.admin_logged = False
         st.rerun()
 
-    st.subheader("⚠ Admin Controls")
+    st.subheader("Admin Controls")
 
     # ADD STAFF
 
-    st.write("Add New Staff")
-
-    new_staff = st.text_input("Staff Name")
+    new_staff = st.text_input("Add New Staff")
 
     if st.button("Add Staff"):
 
@@ -289,30 +298,6 @@ if st.session_state.admin_logged:
         conn.commit()
 
         st.success("Staff Added")
-
-        st.rerun()
-
-    # CHANGE FUEL PRICE
-
-    st.write("Change Fuel Price")
-
-    fuel_change = st.selectbox(
-    "Fuel",
-    ["Petrol","Diesel","Power Petrol"]
-    )
-
-    new_price = st.number_input("New Price")
-
-    if st.button("Update Price"):
-
-        cursor.execute(
-        "UPDATE fuel_price SET price=? WHERE fuel=?",
-        (new_price,fuel_change)
-        )
-
-        conn.commit()
-
-        st.success("Price Updated")
 
         st.rerun()
 
@@ -336,7 +321,7 @@ if st.session_state.admin_logged:
 
         st.rerun()
 
-    # DELETE ALL DATA
+    # DELETE ALL
 
     if st.button("Delete All Data"):
 
