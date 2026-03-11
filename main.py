@@ -176,13 +176,13 @@ if st.session_state.admin_logged:
     st.subheader("⚠ Admin Controls")
 
     # Delete Record
-    record_id = st.selectbox("Select Record ID to Delete", df["rowid"], key="del_id")
-    if st.button("Delete Selected Record"): 
-        cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
-        conn.commit()
-        st.warning("Record Deleted")
-        st.experimental_rerun()
-
+    if not df.empty:
+        record_id = st.selectbox("Select Record ID to Delete", df["rowid"], key="del_id")
+        if st.button("Delete Selected Record"): 
+            cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
+            conn.commit()
+            st.warning("Record Deleted")
+            st.experimental_rerun()
     if st.button("Delete All Data"):
         cursor.execute("DELETE FROM sales")
         conn.commit()
@@ -214,53 +214,61 @@ if st.session_state.admin_logged:
     staff_df = pd.read_sql("SELECT * FROM staff", conn)
     st.dataframe(staff_df)
 
-    # Edit Existing Record
+    # ---------------- EDIT EXISTING RECORD ----------------
     st.subheader("Edit Existing Record")
-    edit_record_id = st.selectbox("Select Record ID to Edit", df["rowid"], key="edit_id")
-    record_to_edit = df[df["rowid"]==edit_record_id].iloc[0]
+    if not df.empty:
+        edit_record_id = st.selectbox("Select Record ID to Edit", df["rowid"], key="edit_id")
+        filtered_df = df[df["rowid"] == edit_record_id]
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        edit_staff = st.selectbox("Staff", staff_list, index=staff_list.index(record_to_edit["staff"]), key="edit_staff")
-    with col2:
-        edit_date = st.date_input("Date", pd.to_datetime(record_to_edit["date"]), key="edit_date")
-    with col3:
-        edit_fuel = st.selectbox("Fuel", ["Petrol","Diesel","Power Petrol"], index=["Petrol","Diesel","Power Petrol"].index(record_to_edit["fuel"]), key="edit_fuel")
+        if not filtered_df.empty:
+            record_to_edit = filtered_df.iloc[0]
 
-    edit_nozzle = st.selectbox(
-        "Nozzle",
-        ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-         "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"],
-        index=int(record_to_edit["nozzle"].split(" ")[1])-1,
-        key="edit_nozzle"
-    )
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                edit_staff = st.selectbox("Staff", staff_list, index=staff_list.index(record_to_edit["staff"]), key="edit_staff")
+            with col2:
+                edit_date = st.date_input("Date", pd.to_datetime(record_to_edit["date"]), key="edit_date")
+            with col3:
+                edit_fuel = st.selectbox("Fuel", ["Petrol","Diesel","Power Petrol"], index=["Petrol","Diesel","Power Petrol"].index(record_to_edit["fuel"]), key="edit_fuel")
 
-    col4, col5 = st.columns(2)
-    with col4: edit_opening = st.number_input("Opening Metre", value=record_to_edit["opening"], key="edit_opening")
-    with col5: edit_closing = st.number_input("Closing Metre", value=record_to_edit["closing"], key="edit_closing")
+            edit_nozzle = st.selectbox(
+                "Nozzle",
+                ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
+                 "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"],
+                index=int(record_to_edit["nozzle"].split(" ")[1])-1,
+                key="edit_nozzle"
+            )
 
-    edit_litres = max(edit_closing - edit_opening, 0)
-    edit_price = petrol_price if edit_fuel=="Petrol" else diesel_price if edit_fuel=="Diesel" else power_price
-    edit_total = edit_litres * edit_price
+            col4, col5 = st.columns(2)
+            with col4: edit_opening = st.number_input("Opening Metre", value=record_to_edit["opening"], key="edit_opening")
+            with col5: edit_closing = st.number_input("Closing Metre", value=record_to_edit["closing"], key="edit_closing")
 
-    edit_duty_in = st.time_input("Duty IN", pd.to_datetime(record_to_edit["duty_in"]).time(), key="edit_duty_in")
-    edit_duty_out = st.time_input("Duty OUT", pd.to_datetime(record_to_edit["duty_out"]).time(), key="edit_duty_out")
+            edit_litres = max(edit_closing - edit_opening, 0)
+            edit_price = petrol_price if edit_fuel=="Petrol" else diesel_price if edit_fuel=="Diesel" else power_price
+            edit_total = edit_litres * edit_price
 
-    edit_in_time = datetime.combine(edit_date, edit_duty_in)
-    edit_out_time = datetime.combine(edit_date, edit_duty_out)
-    edit_hours = max((edit_out_time - edit_in_time).total_seconds()/3600, 0)
+            edit_duty_in = st.time_input("Duty IN", pd.to_datetime(record_to_edit["duty_in"]).time(), key="edit_duty_in")
+            edit_duty_out = st.time_input("Duty OUT", pd.to_datetime(record_to_edit["duty_out"]).time(), key="edit_duty_out")
 
-    if st.button("Save Changes to Record"):
-        cursor.execute("""
-        UPDATE sales SET 
-            date=?, staff=?, fuel=?, nozzle=?, opening=?, closing=?,
-            litres=?, price=?, total=?, duty_in=?, duty_out=?, hours=?
-        WHERE rowid=?
-        """, (
-            str(edit_date), edit_staff, edit_fuel, edit_nozzle, edit_opening, edit_closing,
-            edit_litres, edit_price, edit_total, str(edit_duty_in), str(edit_duty_out), edit_hours,
-            edit_record_id
-        ))
-        conn.commit()
-        st.success("Record Updated Successfully")
-        st.experimental_rerun()
+            edit_in_time = datetime.combine(edit_date, edit_duty_in)
+            edit_out_time = datetime.combine(edit_date, edit_duty_out)
+            edit_hours = max((edit_out_time - edit_in_time).total_seconds()/3600, 0)
+
+            if st.button("Save Changes to Record"):
+                cursor.execute("""
+                UPDATE sales SET 
+                    date=?, staff=?, fuel=?, nozzle=?, opening=?, closing=?,
+                    litres=?, price=?, total=?, duty_in=?, duty_out=?, hours=?
+                WHERE rowid=?
+                """, (
+                    str(edit_date), edit_staff, edit_fuel, edit_nozzle, edit_opening, edit_closing,
+                    edit_litres, edit_price, edit_total, str(edit_duty_in), str(edit_duty_out), edit_hours,
+                    edit_record_id
+                ))
+                conn.commit()
+                st.success("Record Updated Successfully")
+                st.experimental_rerun()
+        else:
+            st.warning("Selected record not found in database.")
+    else:
+        st.info("No sales records available to edit.")
