@@ -3,30 +3,11 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-
-# ---------------- THEME / STYLE ----------------
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
-html,body,[class*="css"]{
-font-family:'Lexend',sans-serif;
-color:black;
-}
-.stApp{
-background-color:#ff6f00;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.title("⛽ Choisons Petrol Pump Management System")
-
 # ---------------- DATABASE ----------------
+
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Create tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 date TEXT,
@@ -43,233 +24,255 @@ duty_out TEXT,
 hours REAL
 )
 """)
-cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT)")
-cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
+
 conn.commit()
 
-# Default fuel prices
-for f, p in [('Petrol',100), ('Diesel',90), ('Power Petrol',105)]:
-    cursor.execute("INSERT OR IGNORE INTO fuel_price(fuel,price) VALUES (?,?)", (f,p))
-conn.commit()
+# ---------------- PAGE CONFIG ----------------
 
-# ---------------- DATA LOAD FUNCTION ----------------
-def load_data():
-    df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-    staff_df = pd.read_sql("SELECT * FROM staff", conn)
-    price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
-    staff_list = staff_df["name"].tolist()
-    price_dict = dict(zip(price_df["fuel"], price_df["price"]))
-    return df, staff_list, price_dict
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
-df, staff_list, price_dict = load_data()
+# ---------------- STYLE ----------------
 
-# ---------------- CONTACT INFO ----------------
-st.info("""
-Phone: +91 8590304889  
-Email: kvpnaseeh@gmail.com  
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
+
+html,body,[class*="css"]{
+font-family:'Lexend',sans-serif;
+color:black;
+}
+
+.stApp{
+background-color:#ff6f00;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- TITLE ----------------
+
+st.title("⛽ Choisons Petrol Pump Management System")
+
+# ---------------- CONTACT ----------------
+
+phone = "+91 8590304889"
+email = "kvpnaseeh@gmail.com\nchoisonscalicut@gmail.com"
+
+st.info(f"""
+**Contact Details**
+
+Phone: {phone}  
+Email: {email}  
+
 Created by Nazeeh
 """)
 
-# ---------------- ADMIN PANEL ----------------
+# ---------------- FUEL PRICES ----------------
+
+st.subheader("Fuel Prices")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    petrol_price = st.number_input("Petrol Price", value=100.0)
+
+with col2:
+    diesel_price = st.number_input("Diesel Price", value=90.0)
+
+with col3:
+    power_price = st.number_input("Power Petrol Price", value=105.0)
+
+# ---------------- STAFF DUTY ----------------
+
+st.subheader("Staff Duty Time")
+
+col4, col5 = st.columns(2)
+
+with col4:
+    duty_in = st.time_input("Duty IN")
+
+with col5:
+    duty_out = st.time_input("Duty OUT")
+
+in_time = datetime.combine(date.today(), duty_in)
+out_time = datetime.combine(date.today(), duty_out)
+
+hours = (out_time - in_time).total_seconds() / 3600
+
+if hours < 0:
+    hours = 0
+
+st.info(f"Work Hours: {round(hours,2)} hrs")
+
+# ---------------- SALES ENTRY ----------------
+
+st.subheader("Sales Entry")
+
+col6, col7, col8 = st.columns(3)
+
+with col6:
+    staff = st.text_input("Staff Name")
+
+with col7:
+    entry_date = st.date_input("Date", date.today())
+
+with col8:
+    fuel = st.selectbox("Fuel Type", ["Petrol", "Diesel", "Power Petrol"])
+
+nozzle = st.selectbox("Nozzle",[
+"Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
+"Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"
+])
+
+col9, col10 = st.columns(2)
+
+with col9:
+    opening = st.number_input("Opening Metre")
+
+with col10:
+    closing = st.number_input("Closing Metre")
+
+litres = closing - opening
+
+if litres < 0:
+    litres = 0
+
+if fuel == "Petrol":
+    price = petrol_price
+elif fuel == "Diesel":
+    price = diesel_price
+else:
+    price = power_price
+
+total = litres * price
+
+st.success(f"Litres Sold: {round(litres,2)} L")
+st.success(f"Total Sale: ₹ {round(total,2)}")
+
+if st.button("Save Entry"):
+
+    cursor.execute("""
+    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    """,(
+        str(entry_date),
+        staff,
+        fuel,
+        nozzle,
+        opening,
+        closing,
+        litres,
+        price,
+        total,
+        str(duty_in),
+        str(duty_out),
+        hours
+    ))
+
+    conn.commit()
+
+    st.success("Data Saved")
+
+# ---------------- LOAD DATA ----------------
+
+df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+
+# ---------------- DATA TABLE ----------------
+
+st.subheader("Sales Records")
+
+st.dataframe(df, use_container_width=True)
+
+# ---------------- DAILY SALES ----------------
+
+st.subheader("Daily Sales Summary")
+
+today = str(date.today())
+
+today_data = df[df["date"] == today]
+
+st.metric("Litres Today", round(today_data["litres"].sum(),2))
+st.metric("Sales Today", round(today_data["total"].sum(),2))
+
+# ---------------- STAFF LITRES ----------------
+
+st.subheader("Monthly Litre Sales Per Staff")
+
+staff_litres = df.groupby("staff")["litres"].sum().reset_index()
+
+st.dataframe(staff_litres)
+
+# ---------------- STAFF HOURS ----------------
+
+st.subheader("Monthly Staff Working Hours")
+
+staff_hours = df.groupby("staff")["hours"].sum().reset_index()
+
+st.dataframe(staff_hours)
+
+# ---------------- NOZZLE SALES ----------------
+
+st.subheader("Nozzle Sales")
+
+nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
+
+st.dataframe(nozzle_sales)
+
+# ---------------- ADMIN LOGIN ----------------
+
 st.sidebar.title("Admin Panel")
+
 admin_user = "admin"
 admin_pass = "admin123"
-if "admin_logged" not in st.session_state:
-    st.session_state.admin_logged=False
 
-username = st.sidebar.text_input("Username", key="admin_username")
-password = st.sidebar.text_input("Password", type="password", key="admin_password")
-if st.sidebar.button("Login", key="admin_login"):
-    if username==admin_user and password==admin_pass:
-        st.session_state.admin_logged=True
+if "admin_logged" not in st.session_state:
+    st.session_state.admin_logged = False
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+
+    if username == admin_user and password == admin_pass:
+        st.session_state.admin_logged = True
         st.sidebar.success("Admin Logged In")
     else:
         st.sidebar.error("Invalid Login")
 
+# ---------------- ADMIN CONTROLS ----------------
+
 if st.session_state.admin_logged:
+
     st.sidebar.success("Admin Mode Active")
-    if st.sidebar.button("Logout", key="admin_logout"):
-        st.session_state.admin_logged=False
-        st.experimental_rerun()
 
-    st.subheader("Admin Controls")
+    if st.sidebar.button("Logout"):
+        st.session_state.admin_logged = False
+        st.rerun()
 
-    # Add staff
-    new_staff = st.text_input("Add Staff", key="add_staff_input")
-    if st.button("Add Staff", key="add_staff_btn"):
-        cursor.execute("INSERT INTO staff VALUES(?)", (new_staff,))
+    st.subheader("⚠ Admin Controls")
+
+    record_id = st.selectbox(
+        "Select Record ID to Delete",
+        df["rowid"]
+    )
+
+    if st.button("Delete Selected Record"):
+
+        cursor.execute(
+            "DELETE FROM sales WHERE rowid = ?",
+            (record_id,)
+        )
+
         conn.commit()
-        st.success("Staff Added")
-        df, staff_list, price_dict = load_data()
 
-    # Delete record
-    if not df.empty:
-        record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
-        if st.button("Delete Record", key="delete_record_btn"):
-            cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
-            conn.commit()
-            st.warning("Record Deleted")
-            df, staff_list, price_dict = load_data()
+        st.warning("Record Deleted")
 
-    # Delete all data
-    if st.button("Delete All Data", key="delete_all_btn"):
+        st.rerun()
+
+    if st.button("Delete All Data"):
+
         cursor.execute("DELETE FROM sales")
+
         conn.commit()
+
         st.error("All Data Deleted")
-        df, staff_list, price_dict = load_data()
 
-    # Admin fuel price update
-    st.subheader("Admin Fuel Price Update")
-    fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
-    price_admin = st.number_input(f"Set Price for " + fuel_admin, min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
-    if st.button("Save Fuel Price", key="save_fuel_btn"):
-        # Update fuel price table
-        cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
-        # Update all past sales for this fuel
-        cursor.execute("""
-            UPDATE sales 
-            SET price = ?, 
-                total = litres * ?
-            WHERE fuel = ?
-        """, (price_admin, price_admin, fuel_admin))
-        conn.commit()
-        st.success(f"{fuel_admin} price updated to ₹{price_admin} for all records")
-        df, staff_list, price_dict = load_data()
-
-# ---------------- STAFF SALES ENTRY ----------------
-st.subheader("Sales Entry")
-col1, col2, col3 = st.columns(3)
-with col1:
-    if len(staff_list)==0:
-        st.warning("Admin must add staff first")
-        staff=""
-    else:
-        staff = st.selectbox("Staff Name", staff_list, key="staff_select")
-with col2:
-    entry_date = st.date_input("Date", date.today(), key="date_entry")
-with col3:
-    fuel_display = [f"{f} (₹{price_dict[f]})" for f in ["Petrol","Diesel","Power Petrol"]]
-    fuel_choice = st.selectbox("Fuel Type", fuel_display, key="fuel_select")
-    fuel = fuel_choice.split(" ")[0]
-price = price_dict.get(fuel,0)
-
-# Nozzle & Metres
-nozzle = st.selectbox("Nozzle", 
-                      ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-                       "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"], 
-                      key="nozzle_select")
-last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
-                   conn, params=(nozzle,))
-default_opening = float(last.iloc[0]["closing"]) if len(last)>0 else 0.0
-col4, col5 = st.columns(2)
-with col4:
-    opening = st.number_input("Opening Metre", value=default_opening, key="opening")
-with col5:
-    closing = st.number_input("Closing Metre", min_value=0.0, key="closing")
-
-# Duty Hours
-col6, col7 = st.columns(2)
-with col6:
-    duty_in = st.time_input("Duty IN", key="duty_in")
-with col7:
-    duty_out = st.time_input("Duty OUT", key="duty_out")
-in_time = datetime.combine(date.today(), duty_in)
-out_time = datetime.combine(date.today(), duty_out)
-hours = max((out_time - in_time).total_seconds()/3600, 0)
-st.info(f"Work Hours: {round(hours,2)} hrs")
-
-# Validation
-if closing < opening:
-    st.error("Closing metre cannot be less than opening metre!")
-    save_allowed = False
-else:
-    if len(last) > 0 and closing - last.iloc[0]["closing"] > 500:
-        st.warning("Closing metre is unusually high compared to last closing metre!")
-    save_allowed = True
-
-# Calculations
-litres = max(closing - opening, 0)
-total = litres * price
-st.success(f"Litres Sold: {round(litres,2)} L")
-st.success(f"Total Sale: ₹ {round(total,2)}")
-
-# Save Entry
-if st.button("Save Entry", key="save_entry"):
-    if staff=="":
-        st.error("Add staff first")
-    elif not save_allowed:
-        st.error("Cannot save entry due to metre error.")
-    else:
-        cursor.execute("""
-        INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-              str(duty_in), str(duty_out), hours))
-        conn.commit()
-        df, staff_list, price_dict = load_data()
-        st.success("Data Saved")
-
-# ---------------- SUMMARIES ----------------
-df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
-
-# Daily Summary
-st.subheader("DAILY SUMMARY")
-today = str(date.today())
-daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
-    "price":"first",
-    "litres":"sum",
-    "total":"sum",
-    "hours":"sum"
-}).reset_index()
-st.dataframe(daily_summary)
-
-# Daily Staff Summary
-st.subheader("DAILY STAFF SUMMARY")
-daily_staff_summary = df[df['date']==today].groupby(["staff"]).agg({
-    "litres":"sum",
-    "total":"sum",
-    "hours":"sum"
-}).reset_index()
-st.dataframe(daily_staff_summary)
-
-# Monthly Summary
-st.subheader("MONTHLY SUMMARY")
-monthly_summary = df.groupby(['month','staff','fuel']).agg({
-    "price":"first",
-    'litres':'sum',
-    'total':'sum',
-    'hours':'sum'
-}).reset_index()
-monthly_summary['month'] = monthly_summary['month'].astype(str)
-st.dataframe(monthly_summary)
-
-# Monthly Staff Summary
-st.subheader("MONTHLY STAFF SUMMARY")
-monthly_staff_summary = df.groupby(['month','staff']).agg({
-    'litres':'sum',
-    'total':'sum',
-    'hours':'sum'
-}).reset_index()
-monthly_staff_summary['month'] = monthly_staff_summary['month'].astype(str)
-st.dataframe(monthly_staff_summary)
-
-# Staff Search / Summary
-st.subheader("Staff Search / Summary")
-if len(staff_list)>0:
-    staff_search = st.selectbox("Select Staff to View Summary", staff_list, key="staff_search")
-    staff_daily = df[(df['date']==today) & (df['staff']==staff_search)]
-    if not staff_daily.empty:
-        st.markdown(f"**Daily Details for {staff_search}:**")
-        st.dataframe(staff_daily)
-    else:
-        st.info(f"No sales today for {staff_search}")
-    
-    staff_month = df[df['staff']==staff_search].groupby(['month','fuel']).agg({
-        'litres':'sum',
-        'total':'sum',
-        'hours':'sum'
-    }).reset_index()
-    if not staff_month.empty:
-        st.markdown(f"**Monthly Summary for {staff_search}:**")
-        st.dataframe(staff_month)
-    else:
-        st.info(f"No monthly records for {staff_search}")
+        st.rerun()
