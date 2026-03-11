@@ -222,6 +222,7 @@ st.sidebar.title("Admin Panel")
 admin_user = "admin"
 admin_pass = "admin123"
 
+# session state
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged = False
 
@@ -236,25 +237,41 @@ if st.sidebar.button("Login"):
     else:
         st.sidebar.error("Invalid Login")
 
-# ---------------- ADMIN DELETE CONTROL ----------------
+# ---------------- ADMIN CONTROLS ----------------
 
 if st.session_state.admin_logged:
 
+    st.sidebar.success("Admin Mode Active")
+
     st.subheader("⚠ Admin Controls")
 
-    record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
+    # IMPORTANT: reload dataframe with rowid
+    df_admin = pd.read_sql("SELECT rowid,* FROM sales", conn)
+
+    record_id = st.selectbox(
+        "Select Record ID to Delete",
+        df_admin["rowid"]
+    )
 
     if st.button("Delete Selected Record"):
 
-        cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
+        cursor.execute(
+            "DELETE FROM sales WHERE rowid = ?",
+            (record_id,)
+        )
+
         conn.commit()
 
         st.warning("Record Deleted")
+
         st.rerun()
 
     if st.button("Delete All Data"):
+
         cursor.execute("DELETE FROM sales")
+
         conn.commit()
 
         st.error("All Data Deleted")
+
         st.rerun()
