@@ -77,7 +77,7 @@ Created by Nazeeh
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
 fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
 
-# ---------------- SESSION STATE FOR RERUN ----------------
+# ---------------- SESSION STATE ----------------
 if "rerun_flag" not in st.session_state: st.session_state.rerun_flag=False
 if "admin_logged" not in st.session_state: st.session_state.admin_logged=False
 
@@ -85,7 +85,7 @@ if "admin_logged" not in st.session_state: st.session_state.admin_logged=False
 staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 if not staff_list: staff_list = ["Add Staff in Admin Panel"]
 
-# ---------------- SALES ENTRY ----------------
+# ---------------- SALES ENTRY (VISIBLE ONLY TO NON-ADMIN) ----------------
 if not st.session_state.admin_logged:
     st.subheader("Sales Entry")
     col1, col2, col3 = st.columns(3)
@@ -96,9 +96,7 @@ if not st.session_state.admin_logged:
         "Fuel Type",
         [f"{f} - ₹{fuel_price_dict.get(f,100.0)}" for f in ["Petrol","Diesel","Power Petrol"]]
     )
-    # Extract fuel name
     fuel = fuel.split(" - ")[0]
-
     current_fuel_price = fuel_price_dict.get(fuel,100.0)
 
     nozzle = st.selectbox("Nozzle",["Nozzle "+str(i) for i in range(1,11)])
@@ -112,7 +110,6 @@ if not st.session_state.admin_logged:
     total = litres*price
     st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
-    # Duty
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
     in_time = datetime.combine(date.today(), duty_in)
@@ -136,12 +133,18 @@ df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 st.subheader("Sales Records")
 st.dataframe(df,use_container_width=True)
 
-# ---------------- DASHBOARD METRICS ----------------
-st.subheader("Daily Summary")
-today_data = df[df["date"]==str(date.today())]
-st.metric("Litres Today", round(today_data["litres"].sum(),2))
-st.metric("Sales Today", round(today_data["total"].sum(),2))
+# ---------------- DAILY SALES SEARCH ----------------
+st.subheader("Search Daily Sales Records")
+search_date = st.date_input("Select Date to Search")
+search_data = df[df["date"]==str(search_date)]
 
+st.write(f"Sales Records for {search_date}:")
+st.dataframe(search_data,use_container_width=True)
+
+st.metric("Litres Sold", round(search_data["litres"].sum(),2))
+st.metric("Total Sales", round(search_data["total"].sum(),2))
+
+# ---------------- DASHBOARD METRICS ----------------
 st.subheader("Staff Monthly Summary")
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 st.dataframe(staff_litres)
@@ -167,10 +170,9 @@ if st.sidebar.button("Login"):
 # ---------------- ADMIN CONTROLS ----------------
 if st.session_state.admin_logged:
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"admin_logged":False, "rerun_flag":True}))
-
     st.subheader("⚠ Admin Controls")
 
-    # ---------------- STAFF MANAGEMENT ----------------
+    # STAFF MANAGEMENT
     st.subheader("Staff Management")
     new_staff = st.text_input("Add New Staff")
     if st.button("Add Staff"):
@@ -185,7 +187,7 @@ if st.session_state.admin_logged:
     staff_df = pd.read_sql("SELECT * FROM staff",conn)
     st.dataframe(staff_df)
 
-    # ---------------- FUEL PRICES ----------------
+    # FUEL PRICES
     st.subheader("Fuel Prices Management")
     for f in ["Petrol","Diesel","Power Petrol"]:
         new_p = st.number_input(f"Price for {f}", value=fuel_price_dict.get(f,100.0))
@@ -196,7 +198,7 @@ if st.session_state.admin_logged:
             st.success(f"{f} price updated. New sales entries will use this price.")
             st.session_state.rerun_flag=True
 
-    # ---------------- SALES RECORDS MANAGEMENT ----------------
+    # SALES RECORDS MANAGEMENT
     st.subheader("Manage Sales Records")
     if not df.empty:
         del_id = st.selectbox("Select Record ID to Delete",df["rowid"])
@@ -213,7 +215,7 @@ if st.session_state.admin_logged:
     else:
         st.info("No sales records yet.")
 
-    # ---------------- EDIT RECORD ----------------
+    # EDIT RECORD
     st.subheader("Edit Existing Record")
     if not df.empty:
         edit_id = st.selectbox("Select Record ID",df["rowid"])
