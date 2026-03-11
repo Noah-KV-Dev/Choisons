@@ -40,7 +40,7 @@ price REAL
 
 conn.commit()
 
-# ---------------- DEFAULT FUEL PRICES ----------------
+# ---------------- DEFAULT DATA ----------------
 
 cursor.execute("SELECT COUNT(*) FROM fuel_price")
 if cursor.fetchone()[0] == 0:
@@ -49,21 +49,53 @@ if cursor.fetchone()[0] == 0:
     cursor.execute("INSERT INTO fuel_price VALUES('Power Petrol',105)")
     conn.commit()
 
-# ---------------- PAGE ----------------
+# ---------------- PAGE CONFIG ----------------
 
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
+# ---------------- STYLE ----------------
+
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
+html,body,[class*="css"]{
+font-family:'Lexend',sans-serif;
+color:black;
+}
+.stApp{
+background-color:#ff6f00;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- TITLE ----------------
+
 st.title("⛽ Choisons Petrol Pump Management System")
 
-# ---------------- LOAD DATA ----------------
+# ---------------- CONTACT ----------------
+
+phone = "+91 8590304889"
+email = "kvpnaseeh@gmail.com\nchoisonscalicut@gmail.com"
+
+st.info(f"""
+**Contact Details**
+
+Phone: {phone}  
+Email: {email}  
+
+Created by Nazeeh
+""")
+
+# ---------------- LOAD DATABASE DATA ----------------
 
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 staff_df = pd.read_sql("SELECT * FROM staff", conn)
 price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
 
 price_dict = dict(zip(price_df["fuel"], price_df["price"]))
+staff_list = staff_df["name"].tolist()
 
-# ---------------- DUTY ----------------
+# ---------------- STAFF DUTY ----------------
 
 st.subheader("Staff Duty Time")
 
@@ -78,7 +110,8 @@ with col2:
 in_time = datetime.combine(date.today(), duty_in)
 out_time = datetime.combine(date.today(), duty_out)
 
-hours = (out_time - in_time).total_seconds()/3600
+hours = (out_time - in_time).total_seconds() / 3600
+
 if hours < 0:
     hours = 0
 
@@ -90,8 +123,6 @@ st.subheader("Sales Entry")
 
 col3,col4,col5 = st.columns(3)
 
-staff_list = staff_df["name"].tolist()
-
 with col3:
     staff = st.selectbox("Staff Name", staff_list)
 
@@ -99,7 +130,7 @@ with col4:
     entry_date = st.date_input("Date", date.today())
 
 with col5:
-    fuel = st.selectbox("Fuel Type",["Petrol","Diesel","Power Petrol"])
+    fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
 
 nozzle = st.selectbox("Nozzle",[
 "Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
@@ -109,9 +140,9 @@ nozzle = st.selectbox("Nozzle",[
 # ---------------- AUTO OPENING METRE ----------------
 
 last = pd.read_sql(
-    "SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
-    conn,
-    params=(nozzle,)
+"SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
+conn,
+params=(nozzle,)
 )
 
 if len(last) > 0:
@@ -127,17 +158,21 @@ with col6:
 with col7:
     closing = st.number_input("Closing Metre")
 
+# ---------------- CALCULATIONS ----------------
+
 litres = closing - opening
+
 if litres < 0:
     litres = 0
 
-price = price_dict[fuel]
+price = price_dict.get(fuel,0)
+
 total = litres * price
 
 st.success(f"Litres Sold: {round(litres,2)} L")
 st.success(f"Total Sale: ₹ {round(total,2)}")
 
-# ---------------- SAVE ----------------
+# ---------------- SAVE ENTRY ----------------
 
 if st.button("Save Entry"):
 
@@ -170,7 +205,7 @@ st.subheader("Sales Records")
 
 st.dataframe(df, use_container_width=True)
 
-# ---------------- DAILY SUMMARY ----------------
+# ---------------- DAILY SALES ----------------
 
 st.subheader("Daily Sales Summary")
 
@@ -181,15 +216,23 @@ today_data = df[df["date"] == today]
 st.metric("Litres Today", round(today_data["litres"].sum(),2))
 st.metric("Sales Today", round(today_data["total"].sum(),2))
 
-# ---------------- STAFF REPORT ----------------
+# ---------------- STAFF LITRES ----------------
 
-st.subheader("Staff Total Litres")
+st.subheader("Monthly Litre Sales Per Staff")
 
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 
 st.dataframe(staff_litres)
 
-# ---------------- NOZZLE REPORT ----------------
+# ---------------- STAFF HOURS ----------------
+
+st.subheader("Monthly Staff Working Hours")
+
+staff_hours = df.groupby("staff")["hours"].sum().reset_index()
+
+st.dataframe(staff_hours)
+
+# ---------------- NOZZLE SALES ----------------
 
 st.subheader("Nozzle Sales")
 
@@ -197,7 +240,7 @@ nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 
 st.dataframe(nozzle_sales)
 
-# ---------------- ADMIN PANEL ----------------
+# ---------------- ADMIN LOGIN ----------------
 
 st.sidebar.title("Admin Panel")
 
@@ -230,7 +273,7 @@ if st.session_state.admin_logged:
 
     st.subheader("⚠ Admin Controls")
 
-    # -------- ADD STAFF --------
+    # ADD STAFF
 
     st.write("Add New Staff")
 
@@ -249,7 +292,7 @@ if st.session_state.admin_logged:
 
         st.rerun()
 
-    # -------- CHANGE FUEL PRICE --------
+    # CHANGE FUEL PRICE
 
     st.write("Change Fuel Price")
 
@@ -273,7 +316,7 @@ if st.session_state.admin_logged:
 
         st.rerun()
 
-    # -------- DELETE RECORD --------
+    # DELETE RECORD
 
     record_id = st.selectbox(
     "Select Record ID",
@@ -293,7 +336,7 @@ if st.session_state.admin_logged:
 
         st.rerun()
 
-    # -------- DELETE ALL --------
+    # DELETE ALL DATA
 
     if st.button("Delete All Data"):
 
