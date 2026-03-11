@@ -236,25 +236,79 @@ if st.sidebar.button("Login"):
     else:
         st.sidebar.error("Invalid Login")
 
-if st.session_state.admin_logged:
-    st.sidebar.success("Admin Mode Active")
-# ---------------- ADMIN DELETE CONTROL ----------------
+# ---------------- ADMIN CONTROLS ----------------
 
 if st.session_state.admin_logged:
+
+    st.sidebar.success("Admin Mode Active")
 
     st.subheader("⚠ Admin Controls")
 
-record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
+    record_id = st.selectbox(
+        "Select Record ID to Delete",
+        df["rowid"]
+    )
 
-if st.button("Delete Selected Record"):
+    if st.button("Delete Selected Record"):
 
-   cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
-   conn.commit()
-   st.warning("Record Deleted")
-   st.rerun()
-if st.button("Delete All Data"):
-   cursor.execute("DELETE FROM sales")
-   conn.commit()
+        cursor.execute(
+            "DELETE FROM sales WHERE rowid = ?",
+            (record_id,)
+        )
 
-   st.error("All Data Deleted")
-   st.rerun()
+        conn.commit()
+
+        st.warning("Record Deleted")
+
+        st.rerun()
+
+    if st.button("Delete All Data"):
+
+        cursor.execute("DELETE FROM sales")
+
+        conn.commit()
+
+        st.error("All Data Deleted")
+
+        st.rerun()
+What I Fixed
+
+1️⃣ Added rowid to query
+
+df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+
+2️⃣ Fixed admin delete section indentation
+
+3️⃣ Ordered sections logically
+
+Database
+Page config
+Style
+Contact
+Fuel price
+Duty
+Sales entry
+Save
+Table
+Reports
+Admin panel
+
+✅ Now:
+
+Delete specific record works
+
+Delete all works
+
+No pandas KeyError
+
+Cleaner structure
+
+If you want, I can also show you 3 powerful upgrades for your petrol pump app:
+
+📊 Daily sales chart
+
+📥 Excel download report
+
+🔐 Secure admin login
+
+These will make your system look like real petrol pump software.
