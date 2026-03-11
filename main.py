@@ -7,7 +7,7 @@ from datetime import date, datetime
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 st.title("⛽ Choisons Petrol Pump Management System")
 
-# ---------------- DATABASE ----------------
+# ---------------- DATABASE SETUP ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -36,7 +36,7 @@ name TEXT
 )
 """)
 
-# Fuel price Table
+# Fuel Price Table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS fuel_price(
 fuel TEXT,
@@ -46,9 +46,9 @@ price REAL
 
 conn.commit()
 
-# ---------------- DEFAULT FUEL PRICE ----------------
+# ---------------- DEFAULT FUEL PRICES ----------------
 cursor.execute("SELECT COUNT(*) FROM fuel_price")
-if cursor.fetchone()[0] == 0:
+if cursor.fetchone()[0]==0:
     cursor.execute("INSERT INTO fuel_price VALUES('Petrol',100)")
     cursor.execute("INSERT INTO fuel_price VALUES('Diesel',90)")
     cursor.execute("INSERT INTO fuel_price VALUES('Power Petrol',105)")
@@ -62,23 +62,22 @@ price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
 staff_list = staff_df["name"].tolist()
 price_dict = dict(zip(price_df["fuel"], price_df["price"]))
 
-# ---------------- CONTACT ----------------
+# ---------------- CONTACT INFO ----------------
 st.info("""
 Phone: +91 8590304889  
 Email: kvpnaseeh@gmail.com  
 Created by Nazeeh
 """)
 
-# ---------------- STAFF FUEL PRICE CHANGE ----------------
+# ---------------- STAFF FUEL PRICE UPDATE ----------------
 st.subheader("Fuel Price Update")
 colp1, colp2, colp3 = st.columns(3)
-
 with colp1:
     fuel_change = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
 with colp2:
     new_price = st.number_input("New Price", min_value=0.0)
 with colp3:
-    if st.button("Update Fuel Price"):
+    if st.button("Update Price"):
         cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (new_price,fuel_change))
         conn.commit()
         st.success("Fuel Price Updated")
@@ -86,15 +85,16 @@ with colp3:
 
 # ---------------- STAFF DUTY ----------------
 st.subheader("Staff Duty Time")
-col1,col2 = st.columns(2)
+col1, col2 = st.columns(2)
 with col1:
     duty_in = st.time_input("Duty IN")
 with col2:
     duty_out = st.time_input("Duty OUT")
+
 in_time = datetime.combine(date.today(), duty_in)
 out_time = datetime.combine(date.today(), duty_out)
 hours = (out_time - in_time).total_seconds() / 3600
-if hours < 0: hours = 0
+if hours<0: hours=0
 st.info(f"Work Hours: {round(hours,2)} hrs")
 
 # ---------------- SALES ENTRY ----------------
@@ -110,14 +110,16 @@ with col4:
     entry_date = st.date_input("Date", date.today())
 with col5:
     fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+
+# Nozzle Selection
 nozzle = st.selectbox("Nozzle", ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
                                  "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"])
 
-# ---------------- AUTO OPENING ----------------
+# Auto-opening metre per nozzle
 last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
                    conn, params=(nozzle,))
 default_opening = float(last.iloc[0]["closing"]) if len(last)>0 else 0.0
-col6,col7 = st.columns(2)
+col6, col7 = st.columns(2)
 with col6:
     opening = st.number_input("Opening Metre", value=default_opening)
 with col7:
@@ -125,7 +127,7 @@ with col7:
 
 # ---------------- CALCULATIONS ----------------
 litres = closing - opening
-if litres <0: litres=0
+if litres<0: litres=0
 price = price_dict.get(fuel,0)
 total = litres*price
 st.success(f"Litres Sold: {round(litres,2)} L")
@@ -144,7 +146,7 @@ if st.button("Save Entry"):
         st.success("Data Saved")
         st.rerun()
 
-# ---------------- SALES TABLE ----------------
+# ---------------- SALES RECORDS ----------------
 st.subheader("Sales Records")
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 st.dataframe(df,use_container_width=True)
@@ -171,12 +173,13 @@ st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
-# ---------------- ADMIN LOGIN ----------------
+# ---------------- ADMIN PANEL ----------------
 st.sidebar.title("Admin Panel")
 admin_user = "admin"
 admin_pass = "admin123"
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged=False
+
 username = st.sidebar.text_input("Username")
 password = st.sidebar.text_input("Password",type="password")
 if st.sidebar.button("Login"):
@@ -193,21 +196,24 @@ if st.session_state.admin_logged:
         st.session_state.admin_logged=False
         st.rerun()
     st.subheader("Admin Controls")
-    # ADD STAFF
+
+    # Add Staff
     new_staff = st.text_input("Add Staff")
     if st.button("Add Staff"):
         cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
         conn.commit()
         st.success("Staff Added")
         st.rerun()
-    # DELETE RECORD
+
+    # Delete Record
     record_id = st.selectbox("Delete Record", df["rowid"])
     if st.button("Delete Record"):
         cursor.execute("DELETE FROM sales WHERE rowid=?",(record_id,))
         conn.commit()
         st.warning("Record Deleted")
         st.rerun()
-    # DELETE ALL DATA
+
+    # Delete All Data
     if st.button("Delete All Data"):
         cursor.execute("DELETE FROM sales")
         conn.commit()
