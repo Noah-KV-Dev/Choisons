@@ -215,3 +215,48 @@ st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 
 st.dataframe(nozzle_sales)
+# ---------------- ADMIN LOGIN ----------------
+
+st.sidebar.title("Admin Panel")
+
+admin_user = "admin"
+admin_pass = "admin123"
+
+if "admin_logged" not in st.session_state:
+    st.session_state.admin_logged = False
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+
+    if username == admin_user and password == admin_pass:
+        st.session_state.admin_logged = True
+        st.sidebar.success("Admin Logged In")
+    else:
+        st.sidebar.error("Invalid Login")
+
+if st.session_state.admin_logged:
+    st.sidebar.success("Admin Mode Active")
+# ---------------- ADMIN DELETE CONTROL ----------------
+
+if st.session_state.admin_logged:
+
+    st.subheader("⚠ Admin Controls")
+
+    record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
+
+    if st.button("Delete Selected Record"):
+
+        cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
+        conn.commit()
+
+        st.warning("Record Deleted")
+        st.rerun()
+
+    if st.button("Delete All Data"):
+        cursor.execute("DELETE FROM sales")
+        conn.commit()
+
+        st.error("All Data Deleted")
+        st.rerun()
