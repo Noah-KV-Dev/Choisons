@@ -258,8 +258,3 @@ if st.session_state.admin_logged:
 
         st.error("All Data Deleted")
         st.rerun()
-📥 Excel download report
-
-🔐 Secure admin login
-
-These will make your system look like real petrol pump software.
