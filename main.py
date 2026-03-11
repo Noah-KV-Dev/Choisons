@@ -134,9 +134,10 @@ with col1:
 with col2:
     entry_date = st.date_input("Date", date.today(), key="date_entry")
 with col3:
-    fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_select")
-
-# Staff cannot change fuel price
+    # Show fuel price in selectbox
+    fuel_display = [f"{f} (₹{price_dict[f]})" for f in ["Petrol","Diesel","Power Petrol"]]
+    fuel_choice = st.selectbox("Fuel Type", fuel_display, key="fuel_select")
+    fuel = fuel_choice.split(" ")[0]  # extract fuel name
 price = price_dict.get(fuel,0)
 
 # ---------------- NOZZLE AND METRES ----------------
@@ -166,6 +167,15 @@ out_time = datetime.combine(date.today(), duty_out)
 hours = max((out_time - in_time).total_seconds()/3600, 0)
 st.info(f"Work Hours: {round(hours,2)} hrs")
 
+# ---------------- VALIDATION ----------------
+if closing < opening:
+    st.error("Closing metre cannot be less than opening metre!")
+    save_allowed = False
+else:
+    if len(last) > 0 and closing - last.iloc[0]["closing"] > 500:
+        st.warning("Closing metre is unusually high compared to last closing metre!")
+    save_allowed = True
+
 # ---------------- CALCULATIONS ----------------
 litres = max(closing - opening, 0)
 total = litres * price
@@ -176,6 +186,8 @@ st.success(f"Total Sale: ₹ {round(total,2)}")
 if st.button("Save Entry", key="save_entry"):
     if staff=="":
         st.error("Add staff first")
+    elif not save_allowed:
+        st.error("Cannot save entry due to metre error.")
     else:
         cursor.execute("""
         INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
@@ -189,7 +201,8 @@ if st.button("Save Entry", key="save_entry"):
 st.subheader("Daily Staff Summary")
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 today = str(date.today())
-daily_summary = df[df['date']==today].groupby("staff").agg({
+daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
+    "price":"first",  # show fuel price
     "litres":"sum",
     "total":"sum",
     "hours":"sum"
@@ -210,7 +223,8 @@ st.dataframe(nozzle_sales)
 # ---------------- MONTHLY STAFF SUMMARY ----------------
 st.subheader("Monthly Staff Summary")
 df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
-monthly_summary = df.groupby(['month','staff']).agg({
+monthly_summary = df.groupby(['month','staff','fuel']).agg({
+    "price":"first",
     'litres':'sum',
     'total':'sum',
     'hours':'sum'
