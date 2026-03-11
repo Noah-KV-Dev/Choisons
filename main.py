@@ -243,11 +243,14 @@ if st.session_state.admin_logged:
     st.metric("Litres Sold", round(search_data["litres"].sum(),2))
     st.metric("Total Sales", round(search_data["total"].sum(),2))
 
-    # ---------------- SEARCH STAFF-WISE SALES (ADMIN ONLY) ----------------
-    st.subheader("Search Staff-wise Sales Records")
+    # ---------------- SEARCH STAFF-WISE SALES (ADMIN ONLY) WITH DATE RANGE ----------------
+    st.subheader("Search Staff-wise Sales Records (Date Range)")
     selected_staff = st.selectbox("Select Staff", staff_list, key="search_staff")
-    staff_data = df[df["staff"]==selected_staff]
-    st.write(f"Sales Records for Staff: {selected_staff}")
+    col1, col2 = st.columns(2)
+    with col1: from_date = st.date_input("From Date", date.today(), key="from_date")
+    with col2: to_date = st.date_input("To Date", date.today(), key="to_date")
+    staff_data = df[(df["staff"]==selected_staff) & (df["date"]>=str(from_date)) & (df["date"]<=str(to_date))]
+    st.write(f"Sales Records for {selected_staff} from {from_date} to {to_date}")
     st.dataframe(staff_data,use_container_width=True)
     st.metric("Litres Sold", round(staff_data["litres"].sum(),2))
     st.metric("Total Sales", round(staff_data["total"].sum(),2))
