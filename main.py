@@ -166,16 +166,6 @@ out_time = datetime.combine(date.today(), duty_out)
 hours = max((out_time - in_time).total_seconds()/3600, 0)
 st.info(f"Work Hours: {round(hours,2)} hrs")
 
-# ---------------- VALIDATION ----------------
-if closing < opening:
-    st.error("Closing metre cannot be less than opening metre!")
-    save_allowed = False
-else:
-    # Highlight if unusually high
-    if len(last) > 0 and closing - last.iloc[0]["closing"] > 500:  # adjust threshold if needed
-        st.warning("Closing metre is unusually high compared to last closing metre!")
-    save_allowed = True
-
 # ---------------- CALCULATIONS ----------------
 litres = max(closing - opening, 0)
 total = litres * price
@@ -186,8 +176,6 @@ st.success(f"Total Sale: ₹ {round(total,2)}")
 if st.button("Save Entry", key="save_entry"):
     if staff=="":
         st.error("Add staff first")
-    elif not save_allowed:
-        st.error("Cannot save entry due to metre error.")
     else:
         cursor.execute("""
         INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
