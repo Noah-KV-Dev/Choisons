@@ -197,16 +197,17 @@ if st.button("Save Entry", key="save_entry"):
         st.success("Data Saved")
         st.rerun()
 
-# ---------------- DAILY STAFF SUMMARY ----------------
-st.subheader("Daily Staff Summary")
+# ---------------- DAILY SUMMARY ----------------
+st.subheader("DAILY SUMMARY")
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 today = str(date.today())
 daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
-    "price":"first",  # show fuel price
+    "price":"first",
     "litres":"sum",
     "total":"sum",
     "hours":"sum"
 }).reset_index()
+daily_summary["Staff Summary"] = daily_summary["staff"] + " - " + daily_summary["fuel"]
 st.dataframe(daily_summary)
 
 # ---------------- DAILY METRICS ----------------
@@ -220,8 +221,8 @@ st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
-# ---------------- MONTHLY STAFF SUMMARY ----------------
-st.subheader("Monthly Staff Summary")
+# ---------------- MONTHLY SUMMARY ----------------
+st.subheader("MONTHLY SUMMARY")
 df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
 monthly_summary = df.groupby(['month','staff','fuel']).agg({
     "price":"first",
@@ -230,4 +231,5 @@ monthly_summary = df.groupby(['month','staff','fuel']).agg({
     'hours':'sum'
 }).reset_index()
 monthly_summary['month'] = monthly_summary['month'].astype(str)
+monthly_summary["Staff Summary"] = monthly_summary["staff"] + " - " + monthly_summary["fuel"]
 st.dataframe(monthly_summary)
