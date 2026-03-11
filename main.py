@@ -80,6 +80,10 @@ out_time = datetime.combine(date.today(), duty_out)
 hours = max((out_time - in_time).total_seconds() / 3600, 0)
 st.info(f"Work Hours: {round(hours,2)} hrs")
 
+# ---------------- SESSION STATE FLAGS FOR SAFE RERUN ----------------
+if "rerun_flag" not in st.session_state:
+    st.session_state.rerun_flag = False
+
 # ---------------- SALES ENTRY ----------------
 st.subheader("Sales Entry")
 col6, col7, col8 = st.columns(3)
@@ -120,7 +124,7 @@ if st.button("Save Entry"):
     ))
     conn.commit()
     st.success("Data Saved")
-    st.experimental_rerun()
+    st.session_state.rerun_flag = True
 
 # ---------------- LOAD DATA ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
@@ -171,7 +175,7 @@ if st.session_state.admin_logged:
     st.sidebar.success("Admin Mode Active")
     if st.sidebar.button("Logout"):
         st.session_state.admin_logged=False
-        st.experimental_rerun()
+        st.session_state.rerun_flag = True
 
     st.subheader("⚠ Admin Controls")
 
@@ -182,12 +186,13 @@ if st.session_state.admin_logged:
             cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
             conn.commit()
             st.warning("Record Deleted")
-            st.experimental_rerun()
+            st.session_state.rerun_flag = True
+
     if st.button("Delete All Data"):
         cursor.execute("DELETE FROM sales")
         conn.commit()
         st.error("All Data Deleted")
-        st.experimental_rerun()
+        st.session_state.rerun_flag = True
 
     # Update Fuel Prices
     st.subheader("Update Fuel Prices")
@@ -197,7 +202,7 @@ if st.session_state.admin_logged:
         cursor.execute("UPDATE sales SET price=?, total=litres*? WHERE fuel=?", (new_price, new_price, fuel_to_update))
         conn.commit()
         st.success(f"Updated all {fuel_to_update} entries with price ₹{new_price}")
-        st.experimental_rerun()
+        st.session_state.rerun_flag = True
 
     # Add New Staff
     st.subheader("Add New Staff")
@@ -210,7 +215,8 @@ if st.session_state.admin_logged:
                 st.success(f"Staff '{new_staff}' added")
             except sqlite3.IntegrityError:
                 st.error("Staff already exists")
-            st.experimental_rerun()
+            st.session_state.rerun_flag = True
+
     staff_df = pd.read_sql("SELECT * FROM staff", conn)
     st.dataframe(staff_df)
 
@@ -267,8 +273,13 @@ if st.session_state.admin_logged:
                 ))
                 conn.commit()
                 st.success("Record Updated Successfully")
-                st.experimental_rerun()
+                st.session_state.rerun_flag = True
         else:
             st.warning("Selected record not found in database.")
     else:
         st.info("No sales records available to edit.")
+
+# ---------------- SAFE RERUN ----------------
+if st.session_state.rerun_flag:
+    st.session_state.rerun_flag = False
+    st.experimental_rerun()
