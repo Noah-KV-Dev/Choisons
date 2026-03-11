@@ -52,7 +52,7 @@ for f, p in [('Petrol',100), ('Diesel',90), ('Power Petrol',105)]:
     cursor.execute("INSERT OR IGNORE INTO fuel_price(fuel,price) VALUES (?,?)", (f,p))
 conn.commit()
 
-# Load data
+# ---------------- DATA LOAD FUNCTION ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
     staff_df = pd.read_sql("SELECT * FROM staff", conn)
@@ -91,6 +91,7 @@ if st.session_state.admin_logged:
     if st.sidebar.button("Logout", key="admin_logout"):
         st.session_state.admin_logged=False
         st.experimental_rerun()
+
     st.subheader("Admin Controls")
 
     # Add staff
@@ -100,16 +101,15 @@ if st.session_state.admin_logged:
         conn.commit()
         st.success("Staff Added")
         df, staff_list, price_dict = load_data()
-        st.experimental_rerun()
 
     # Delete record
-    record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
-    if st.button("Delete Record", key="delete_record_btn"):
-        cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
-        conn.commit()
-        st.warning("Record Deleted")
-        df, staff_list, price_dict = load_data()
-        st.experimental_rerun()
+    if not df.empty:
+        record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
+        if st.button("Delete Record", key="delete_record_btn"):
+            cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
+            conn.commit()
+            st.warning("Record Deleted")
+            df, staff_list, price_dict = load_data()
 
     # Delete all data
     if st.button("Delete All Data", key="delete_all_btn"):
@@ -117,9 +117,8 @@ if st.session_state.admin_logged:
         conn.commit()
         st.error("All Data Deleted")
         df, staff_list, price_dict = load_data()
-        st.experimental_rerun()
 
-    # Admin fuel price change (update all records)
+    # Admin fuel price update
     st.subheader("Admin Fuel Price Update")
     fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
     price_admin = st.number_input(f"Set Price for " + fuel_admin, min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
@@ -136,7 +135,6 @@ if st.session_state.admin_logged:
         conn.commit()
         st.success(f"{fuel_admin} price updated to ₹{price_admin} for all records")
         df, staff_list, price_dict = load_data()
-        st.experimental_rerun()
 
 # ---------------- STAFF SALES ENTRY ----------------
 st.subheader("Sales Entry")
@@ -209,7 +207,6 @@ if st.button("Save Entry", key="save_entry"):
         conn.commit()
         df, staff_list, price_dict = load_data()
         st.success("Data Saved")
-        st.experimental_rerun()
 
 # ---------------- SUMMARIES ----------------
 df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
