@@ -237,15 +237,42 @@ if st.sidebar.button("Login"):
     else:
         st.sidebar.error("Invalid Login")
 
+# ---------------- ADMIN LOGIN ----------------
+
+st.sidebar.title("Admin Panel")
+
+admin_user = "admin"
+admin_pass = "admin123"
+
+# Session state
+if "admin_logged" not in st.session_state:
+    st.session_state.admin_logged = False
+
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+
+    if username == admin_user and password == admin_pass:
+        st.session_state.admin_logged = True
+        st.sidebar.success("Admin Logged In")
+    else:
+        st.sidebar.error("Invalid Login")
+
 # ---------------- ADMIN CONTROLS ----------------
 
 if st.session_state.admin_logged:
 
     st.sidebar.success("Admin Mode Active")
 
+    # LOGOUT BUTTON
+    if st.sidebar.button("Logout"):
+        st.session_state.admin_logged = False
+        st.sidebar.warning("Logged Out")
+        st.rerun()
+
     st.subheader("⚠ Admin Controls")
 
-    # IMPORTANT: reload dataframe with rowid
     df_admin = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
     record_id = st.selectbox(
