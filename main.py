@@ -8,7 +8,6 @@ import socket
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# ---------------- TABLES ----------------
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
     date TEXT,
@@ -26,13 +25,24 @@ CREATE TABLE IF NOT EXISTS sales(
     ip_address TEXT
 )
 """)
-
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS staff(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE
 )
 """)
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS fuel_prices(
+    fuel TEXT UNIQUE,
+    price REAL
+)
+""")
+conn.commit()
+
+# ---------------- INITIALIZE DEFAULT FUEL PRICES ----------------
+default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
+for fuel, price in default_prices.items():
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel,price) VALUES (?,?)",(fuel,price))
 conn.commit()
 
 # ---------------- PAGE CONFIG ----------------
@@ -63,105 +73,87 @@ Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com
 Created by Nazeeh
 """)
 
-# ---------------- FUEL PRICES ----------------
-st.subheader("Fuel Prices")
-col1, col2, col3 = st.columns(3)
-with col1: petrol_price = st.number_input("Petrol Price", value=100.0)
-with col2: diesel_price = st.number_input("Diesel Price", value=90.0)
-with col3: power_price = st.number_input("Power Petrol Price", value=105.0)
+# ---------------- FETCH CURRENT FUEL PRICES ----------------
+fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
+fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
 
-# ---------------- STAFF DUTY ----------------
-st.subheader("Staff Duty Time")
-col4, col5 = st.columns(2)
-with col4: duty_in = st.time_input("Duty IN")
-with col5: duty_out = st.time_input("Duty OUT")
-in_time = datetime.combine(date.today(), duty_in)
-out_time = datetime.combine(date.today(), duty_out)
-hours = max((out_time - in_time).total_seconds() / 3600, 0)
-st.info(f"Work Hours: {round(hours,2)} hrs")
+# ---------------- SESSION STATE FOR RERUN ----------------
+if "rerun_flag" not in st.session_state: st.session_state.rerun_flag=False
 
-# ---------------- SESSION STATE FLAGS FOR SAFE RERUN ----------------
-if "rerun_flag" not in st.session_state:
-    st.session_state.rerun_flag = False
+# ---------------- STAFF LIST ----------------
+staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+if not staff_list: staff_list = ["Add Staff in Admin Panel"]
 
 # ---------------- SALES ENTRY ----------------
 st.subheader("Sales Entry")
-col6, col7, col8 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-# Staff list from DB
-staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-if not staff_list: staff_list = ["Add Staff in Admin Panel"]
-with col6: staff = st.selectbox("Staff Name", staff_list)
-with col7: entry_date = st.date_input("Date", date.today())
-with col8: fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+with col1: staff = st.selectbox("Staff Name", staff_list)
+with col2: entry_date = st.date_input("Date", date.today())
+with col3: fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
 
-nozzle = st.selectbox(
-    "Nozzle",
-    ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-     "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"]
-)
+# default price based on fuel
+current_fuel_price = fuel_price_dict.get(fuel,100.0)
 
-col9, col10 = st.columns(2)
-with col9: opening = st.number_input("Opening Metre")
-with col10: closing = st.number_input("Closing Metre")
+nozzle = st.selectbox("Nozzle",["Nozzle "+str(i) for i in range(1,11)])
 
-litres = max(closing - opening, 0)
-price = petrol_price if fuel=="Petrol" else diesel_price if fuel=="Diesel" else power_price
-total = litres * price
+col4, col5 = st.columns(2)
+with col4: opening = st.number_input("Opening Metre")
+with col5: closing = st.number_input("Closing Metre")
 
-st.success(f"Litres Sold: {round(litres,2)} L")
-st.success(f"Total Sale: ₹ {round(total,2)}")
+litres = max(closing-opening,0)
+price = current_fuel_price
+total = litres*price
+st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
+
+# Duty
+duty_in = st.time_input("Duty IN")
+duty_out = st.time_input("Duty OUT")
+in_time = datetime.combine(date.today(), duty_in)
+out_time = datetime.combine(date.today(), duty_out)
+hours = max((out_time-in_time).total_seconds()/3600,0)
 
 ip_address = socket.gethostbyname(socket.gethostname())
 
 if st.button("Save Entry"):
     cursor.execute("""
     INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """, (
-        str(entry_date), staff, fuel, nozzle, opening, closing,
-        litres, price, total, str(duty_in), str(duty_out),
-        hours, ip_address
-    ))
+    """,(str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+         str(duty_in), str(duty_out), hours, ip_address))
     conn.commit()
     st.success("Data Saved")
-    st.session_state.rerun_flag = True
+    st.session_state.rerun_flag=True
 
-# ---------------- LOAD DATA ----------------
+# ---------------- LOAD SALES DATA ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
-# ---------------- DATA TABLE ----------------
 st.subheader("Sales Records")
-st.dataframe(df, use_container_width=True)
+st.dataframe(df,use_container_width=True)
 
-# ---------------- DAILY SALES ----------------
-st.subheader("Daily Sales Summary")
+# ---------------- DASHBOARD METRICS ----------------
+st.subheader("Daily Summary")
 today_data = df[df["date"]==str(date.today())]
 st.metric("Litres Today", round(today_data["litres"].sum(),2))
 st.metric("Sales Today", round(today_data["total"].sum(),2))
 
-# ---------------- STAFF LITRES ----------------
-st.subheader("Monthly Litre Sales Per Staff")
+st.subheader("Staff Monthly Summary")
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 st.dataframe(staff_litres)
-
-# ---------------- STAFF HOURS ----------------
-st.subheader("Monthly Staff Working Hours")
 staff_hours = df.groupby("staff")["hours"].sum().reset_index()
 st.dataframe(staff_hours)
 
-# ---------------- NOZZLE SALES ----------------
 st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
-# ---------------- ADMIN LOGIN ----------------
+# ---------------- ADMIN PANEL ----------------
 st.sidebar.title("Admin Panel")
 admin_user = "admin"
 admin_pass = "admin123"
 if "admin_logged" not in st.session_state: st.session_state.admin_logged=False
 
 username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
+password = st.sidebar.text_input("Password",type="password")
 
 if st.sidebar.button("Login"):
     if username==admin_user and password==admin_pass:
@@ -173,113 +165,88 @@ if st.sidebar.button("Login"):
 # ---------------- ADMIN CONTROLS ----------------
 if st.session_state.admin_logged:
     st.sidebar.success("Admin Mode Active")
-    if st.sidebar.button("Logout"):
-        st.session_state.admin_logged=False
-        st.session_state.rerun_flag = True
+    
+    # ---------------- GROUPWISE SIDEBAR ----------------
+    admin_section = st.sidebar.radio("Admin Sections",["Staff","Fuel Prices","Sales Records","Edit Record"])
 
-    st.subheader("⚠ Admin Controls")
+    if admin_section=="Staff":
+        st.subheader("Staff Management")
+        new_staff = st.text_input("Add New Staff")
+        if st.button("Add Staff"):
+            if new_staff.strip()!="":
+                try:
+                    cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff.strip(),))
+                    conn.commit()
+                    st.success(f"Staff '{new_staff}' added")
+                    st.session_state.rerun_flag=True
+                except sqlite3.IntegrityError:
+                    st.error("Staff already exists")
+        staff_df = pd.read_sql("SELECT * FROM staff",conn)
+        st.dataframe(staff_df)
 
-    # Delete Record
-    if not df.empty:
-        record_id = st.selectbox("Select Record ID to Delete", df["rowid"], key="del_id")
-        if st.button("Delete Selected Record"): 
-            cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
-            conn.commit()
-            st.warning("Record Deleted")
-            st.session_state.rerun_flag = True
-
-    if st.button("Delete All Data"):
-        cursor.execute("DELETE FROM sales")
-        conn.commit()
-        st.error("All Data Deleted")
-        st.session_state.rerun_flag = True
-
-    # Update Fuel Prices
-    st.subheader("Update Fuel Prices")
-    fuel_to_update = st.selectbox("Select Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_update")
-    new_price = st.number_input("New Price", min_value=0.0, value=100.0, step=0.5, key="new_price")
-    if st.button("Update Fuel Price in All Records"):
-        cursor.execute("UPDATE sales SET price=?, total=litres*? WHERE fuel=?", (new_price, new_price, fuel_to_update))
-        conn.commit()
-        st.success(f"Updated all {fuel_to_update} entries with price ₹{new_price}")
-        st.session_state.rerun_flag = True
-
-    # Add New Staff
-    st.subheader("Add New Staff")
-    new_staff = st.text_input("Staff Name", key="new_staff")
-    if st.button("Add Staff"):
-        if new_staff.strip() != "":
-            try:
-                cursor.execute("INSERT INTO staff(name) VALUES (?)", (new_staff.strip(),))
+    elif admin_section=="Fuel Prices":
+        st.subheader("Update Fuel Prices")
+        for f in ["Petrol","Diesel","Power Petrol"]:
+            new_p = st.number_input(f"Price for {f}",value=fuel_price_dict.get(f,100.0))
+            if st.button(f"Update {f} Price"):
+                cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_p,f))
                 conn.commit()
-                st.success(f"Staff '{new_staff}' added")
-            except sqlite3.IntegrityError:
-                st.error("Staff already exists")
-            st.session_state.rerun_flag = True
+                fuel_price_dict[f]=new_p
+                st.success(f"{f} price updated. Default sales price will auto-use this value.")
+                st.session_state.rerun_flag=True
 
-    staff_df = pd.read_sql("SELECT * FROM staff", conn)
-    st.dataframe(staff_df)
-
-    # ---------------- EDIT EXISTING RECORD ----------------
-    st.subheader("Edit Existing Record")
-    if not df.empty:
-        edit_record_id = st.selectbox("Select Record ID to Edit", df["rowid"], key="edit_id")
-        filtered_df = df[df["rowid"] == edit_record_id]
-
-        if not filtered_df.empty:
-            record_to_edit = filtered_df.iloc[0]
-
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                edit_staff = st.selectbox("Staff", staff_list, index=staff_list.index(record_to_edit["staff"]), key="edit_staff")
-            with col2:
-                edit_date = st.date_input("Date", pd.to_datetime(record_to_edit["date"]), key="edit_date")
-            with col3:
-                edit_fuel = st.selectbox("Fuel", ["Petrol","Diesel","Power Petrol"], index=["Petrol","Diesel","Power Petrol"].index(record_to_edit["fuel"]), key="edit_fuel")
-
-            edit_nozzle = st.selectbox(
-                "Nozzle",
-                ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-                 "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"],
-                index=int(record_to_edit["nozzle"].split(" ")[1])-1,
-                key="edit_nozzle"
-            )
-
-            col4, col5 = st.columns(2)
-            with col4: edit_opening = st.number_input("Opening Metre", value=record_to_edit["opening"], key="edit_opening")
-            with col5: edit_closing = st.number_input("Closing Metre", value=record_to_edit["closing"], key="edit_closing")
-
-            edit_litres = max(edit_closing - edit_opening, 0)
-            edit_price = petrol_price if edit_fuel=="Petrol" else diesel_price if edit_fuel=="Diesel" else power_price
-            edit_total = edit_litres * edit_price
-
-            edit_duty_in = st.time_input("Duty IN", pd.to_datetime(record_to_edit["duty_in"]).time(), key="edit_duty_in")
-            edit_duty_out = st.time_input("Duty OUT", pd.to_datetime(record_to_edit["duty_out"]).time(), key="edit_duty_out")
-
-            edit_in_time = datetime.combine(edit_date, edit_duty_in)
-            edit_out_time = datetime.combine(edit_date, edit_duty_out)
-            edit_hours = max((edit_out_time - edit_in_time).total_seconds()/3600, 0)
-
-            if st.button("Save Changes to Record"):
-                cursor.execute("""
-                UPDATE sales SET 
-                    date=?, staff=?, fuel=?, nozzle=?, opening=?, closing=?,
-                    litres=?, price=?, total=?, duty_in=?, duty_out=?, hours=?
-                WHERE rowid=?
-                """, (
-                    str(edit_date), edit_staff, edit_fuel, edit_nozzle, edit_opening, edit_closing,
-                    edit_litres, edit_price, edit_total, str(edit_duty_in), str(edit_duty_out), edit_hours,
-                    edit_record_id
-                ))
+    elif admin_section=="Sales Records":
+        st.subheader("Manage Sales Records")
+        if not df.empty:
+            del_id = st.selectbox("Select Record ID to Delete",df["rowid"])
+            if st.button("Delete Record"):
+                cursor.execute("DELETE FROM sales WHERE rowid=?",(del_id,))
                 conn.commit()
-                st.success("Record Updated Successfully")
-                st.session_state.rerun_flag = True
+                st.warning("Record deleted")
+                st.session_state.rerun_flag=True
+            if st.button("Delete All Sales"):
+                cursor.execute("DELETE FROM sales")
+                conn.commit()
+                st.error("All sales deleted")
+                st.session_state.rerun_flag=True
         else:
-            st.warning("Selected record not found in database.")
-    else:
-        st.info("No sales records available to edit.")
+            st.info("No sales records yet.")
+
+    elif admin_section=="Edit Record":
+        st.subheader("Edit Existing Record")
+        if not df.empty:
+            edit_id = st.selectbox("Select Record ID",df["rowid"])
+            rec = df[df["rowid"]==edit_id]
+            if not rec.empty:
+                rec = rec.iloc[0]
+                col1, col2, col3 = st.columns(3)
+                with col1: edit_staff = st.selectbox("Staff",staff_list,index=staff_list.index(rec["staff"]))
+                with col2: edit_date = st.date_input("Date",pd.to_datetime(rec["date"]))
+                with col3: edit_fuel = st.selectbox("Fuel", ["Petrol","Diesel","Power Petrol"],
+                                                   index=["Petrol","Diesel","Power Petrol"].index(rec["fuel"]))
+                edit_nozzle = st.selectbox("Nozzle",["Nozzle "+str(i) for i in range(1,11)],
+                                           index=int(rec["nozzle"].split()[1])-1)
+                col4,col5 = st.columns(2)
+                with col4: edit_opening = st.number_input("Opening Metre",rec["opening"])
+                with col5: edit_closing = st.number_input("Closing Metre",rec["closing"])
+                edit_litres = max(edit_closing-edit_opening,0)
+                edit_price = fuel_price_dict.get(edit_fuel,100.0)
+                edit_total = edit_litres*edit_price
+                edit_duty_in = st.time_input("Duty IN",pd.to_datetime(rec["duty_in"]).time())
+                edit_duty_out = st.time_input("Duty OUT",pd.to_datetime(rec["duty_out"]).time())
+                edit_hours = max((datetime.combine(edit_date,edit_duty_out)-datetime.combine(edit_date,edit_duty_in)).total_seconds()/3600,0)
+                if st.button("Save Changes"):
+                    cursor.execute("""
+                    UPDATE sales SET date=?, staff=?, fuel=?, nozzle=?, opening=?, closing=?,
+                        litres=?, price=?, total=?, duty_in=?, duty_out=?, hours=?
+                    WHERE rowid=?
+                    """,(str(edit_date), edit_staff, edit_fuel, edit_nozzle, edit_opening, edit_closing,
+                         edit_litres, edit_price, edit_total, str(edit_duty_in), str(edit_duty_out), edit_hours, edit_id))
+                    conn.commit()
+                    st.success("Record updated")
+                    st.session_state.rerun_flag=True
 
 # ---------------- SAFE RERUN ----------------
 if st.session_state.rerun_flag:
-    st.session_state.rerun_flag = False
+    st.session_state.rerun_flag=False
     st.experimental_rerun()
