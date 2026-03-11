@@ -3,6 +3,12 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 
+# ---------------- PAGE CONFIG ----------------
+
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+
+st.title("⛽ Choisons Petrol Pump Management System")
+
 # ---------------- DATABASE ----------------
 
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
@@ -40,7 +46,7 @@ price REAL
 
 conn.commit()
 
-# ---------------- DEFAULT PRICE ----------------
+# ---------------- DEFAULT FUEL PRICE ----------------
 
 cursor.execute("SELECT COUNT(*) FROM fuel_price")
 if cursor.fetchone()[0] == 0:
@@ -51,11 +57,14 @@ if cursor.fetchone()[0] == 0:
 
     conn.commit()
 
-# ---------------- PAGE ----------------
+# ---------------- LOAD DATA ----------------
 
-st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+staff_df = pd.read_sql("SELECT * FROM staff", conn)
+price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
 
-st.title("⛽ Choisons Petrol Pump Management System")
+staff_list = staff_df["name"].tolist()
+price_dict = dict(zip(price_df["fuel"], price_df["price"]))
 
 # ---------------- CONTACT ----------------
 
@@ -65,16 +74,7 @@ Email: kvpnaseeh@gmail.com
 Created by Nazeeh
 """)
 
-# ---------------- LOAD DATA ----------------
-
-df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-staff_df = pd.read_sql("SELECT * FROM staff", conn)
-price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
-
-price_dict = dict(zip(price_df["fuel"], price_df["price"]))
-staff_list = staff_df["name"].tolist()
-
-# ---------------- STAFF PRICE CHANGE ----------------
+# ---------------- FUEL PRICE CHANGE (STAFF) ----------------
 
 st.subheader("Fuel Price Update")
 
@@ -87,10 +87,10 @@ with colp1:
     )
 
 with colp2:
-    new_price = st.number_input("New Price")
+    new_price = st.number_input("New Price", min_value=0.0)
 
 with colp3:
-    if st.button("Update Fuel Price"):
+    if st.button("Update Price"):
 
         cursor.execute(
         "UPDATE fuel_price SET price=? WHERE fuel=?",
@@ -98,12 +98,10 @@ with colp3:
         )
 
         conn.commit()
-
-        st.success("Fuel Price Updated")
-
+        st.success("Price Updated")
         st.rerun()
 
-# ---------------- STAFF DUTY ----------------
+# ---------------- DUTY TIME ----------------
 
 st.subheader("Staff Duty Time")
 
@@ -118,7 +116,7 @@ with col2:
 in_time = datetime.combine(date.today(), duty_in)
 out_time = datetime.combine(date.today(), duty_out)
 
-hours = (out_time - in_time).total_seconds()/3600
+hours = (out_time - in_time).total_seconds() / 3600
 
 if hours < 0:
     hours = 0
@@ -132,20 +130,29 @@ st.subheader("Sales Entry")
 col3,col4,col5 = st.columns(3)
 
 with col3:
-    staff = st.selectbox("Staff Name", staff_list)
+    if len(staff_list) == 0:
+        st.warning("Admin must add staff first")
+        staff = ""
+    else:
+        staff = st.selectbox("Staff Name", staff_list)
 
 with col4:
     entry_date = st.date_input("Date", date.today())
 
 with col5:
-    fuel = st.selectbox("Fuel Type",["Petrol","Diesel","Power Petrol"])
+    fuel = st.selectbox(
+        "Fuel Type",
+        ["Petrol","Diesel","Power Petrol"]
+    )
+
+# ---------------- NOZZLE ----------------
 
 nozzle = st.selectbox("Nozzle",[
 "Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
 "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"
 ])
 
-# ---------------- AUTO OPENING METRE ----------------
+# ---------------- AUTO OPENING ----------------
 
 last = pd.read_sql(
 "SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
@@ -154,22 +161,19 @@ params=(nozzle,)
 )
 
 if len(last) > 0:
-    default_opening = last.iloc[0]["closing"]
+    default_opening = float(last.iloc[0]["closing"])
 else:
-    default_opening = 0
+    default_opening = 0.0
 
 col6,col7 = st.columns(2)
 
 with col6:
-    opening = st.number_input(
-        "Opening Metre",
-        value=float(default_opening)
-    )
+    opening = st.number_input("Opening Metre", value=default_opening)
 
 with col7:
-    closing = st.number_input("Closing Metre")
+    closing = st.number_input("Closing Metre", min_value=0.0)
 
-# ---------------- CALCULATIONS ----------------
+# ---------------- CALCULATE ----------------
 
 litres = closing - opening
 
@@ -187,28 +191,32 @@ st.success(f"Total Sale: ₹ {round(total,2)}")
 
 if st.button("Save Entry"):
 
-    cursor.execute("""
-    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-    """,(
-        str(entry_date),
-        staff,
-        fuel,
-        nozzle,
-        opening,
-        closing,
-        litres,
-        price,
-        total,
-        str(duty_in),
-        str(duty_out),
-        hours
-    ))
+    if staff == "":
+        st.error("Add staff first")
+    else:
 
-    conn.commit()
+        cursor.execute("""
+        INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        """,(
+            str(entry_date),
+            staff,
+            fuel,
+            nozzle,
+            opening,
+            closing,
+            litres,
+            price,
+            total,
+            str(duty_in),
+            str(duty_out),
+            hours
+        ))
 
-    st.success("Data Saved")
+        conn.commit()
 
-    st.rerun()
+        st.success("Data Saved")
+
+        st.rerun()
 
 # ---------------- SALES TABLE ----------------
 
@@ -284,9 +292,7 @@ if st.session_state.admin_logged:
 
     st.subheader("Admin Controls")
 
-    # ADD STAFF
-
-    new_staff = st.text_input("Add New Staff")
+    new_staff = st.text_input("Add Staff")
 
     if st.button("Add Staff"):
 
@@ -296,16 +302,12 @@ if st.session_state.admin_logged:
         )
 
         conn.commit()
-
         st.success("Staff Added")
-
         st.rerun()
 
-    # DELETE RECORD
-
     record_id = st.selectbox(
-    "Select Record ID",
-    df["rowid"]
+        "Delete Record",
+        df["rowid"]
     )
 
     if st.button("Delete Record"):
@@ -316,19 +318,13 @@ if st.session_state.admin_logged:
         )
 
         conn.commit()
-
         st.warning("Record Deleted")
-
         st.rerun()
-
-    # DELETE ALL
 
     if st.button("Delete All Data"):
 
         cursor.execute("DELETE FROM sales")
 
         conn.commit()
-
         st.error("All Data Deleted")
-
         st.rerun()
