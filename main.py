@@ -127,24 +127,9 @@ if not st.session_state.admin_logged:
         st.success("Data Saved")
         st.session_state.rerun_flag=True
 
-# ---------------- LOAD SALES DATA ----------------
+# ---------------- DASHBOARD METRICS ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
-st.subheader("Sales Records")
-st.dataframe(df,use_container_width=True)
-
-# ---------------- DAILY SALES SEARCH ----------------
-st.subheader("Search Daily Sales Records")
-search_date = st.date_input("Select Date to Search")
-search_data = df[df["date"]==str(search_date)]
-
-st.write(f"Sales Records for {search_date}:")
-st.dataframe(search_data,use_container_width=True)
-
-st.metric("Litres Sold", round(search_data["litres"].sum(),2))
-st.metric("Total Sales", round(search_data["total"].sum(),2))
-
-# ---------------- DASHBOARD METRICS ----------------
 st.subheader("Staff Monthly Summary")
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 st.dataframe(staff_litres)
@@ -248,6 +233,18 @@ if st.session_state.admin_logged:
                 conn.commit()
                 st.success("Record updated")
                 st.session_state.rerun_flag=True
+
+# ---------------- SALES RECORDS (BOTTOM OF PAGE) ----------------
+st.subheader("Sales Records")
+st.dataframe(df,use_container_width=True)
+
+st.subheader("Search Daily Sales Records")
+search_date = st.date_input("Select Date to Search", date.today())
+search_data = df[df["date"]==str(search_date)]
+st.write(f"Sales Records for {search_date}:")
+st.dataframe(search_data,use_container_width=True)
+st.metric("Litres Sold", round(search_data["litres"].sum(),2))
+st.metric("Total Sales", round(search_data["total"].sum(),2))
 
 # ---------------- SAFE RERUN ----------------
 if st.session_state.rerun_flag:
