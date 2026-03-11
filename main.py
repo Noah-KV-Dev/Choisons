@@ -86,43 +86,49 @@ staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 if not staff_list: staff_list = ["Add Staff in Admin Panel"]
 
 # ---------------- SALES ENTRY ----------------
-st.subheader("Sales Entry")
-col1, col2, col3 = st.columns(3)
+if not st.session_state.admin_logged:
+    st.subheader("Sales Entry")
+    col1, col2, col3 = st.columns(3)
 
-with col1: staff = st.selectbox("Staff Name", staff_list)
-with col2: entry_date = st.date_input("Date", date.today())
-with col3: fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+    with col1: staff = st.selectbox("Staff Name", staff_list)
+    with col2: entry_date = st.date_input("Date", date.today())
+    with col3: fuel = st.selectbox(
+        "Fuel Type",
+        [f"{f} - ₹{fuel_price_dict.get(f,100.0)}" for f in ["Petrol","Diesel","Power Petrol"]]
+    )
+    # Extract fuel name
+    fuel = fuel.split(" - ")[0]
 
-current_fuel_price = fuel_price_dict.get(fuel,100.0)
+    current_fuel_price = fuel_price_dict.get(fuel,100.0)
 
-nozzle = st.selectbox("Nozzle",["Nozzle "+str(i) for i in range(1,11)])
+    nozzle = st.selectbox("Nozzle",["Nozzle "+str(i) for i in range(1,11)])
 
-col4, col5 = st.columns(2)
-with col4: opening = st.number_input("Opening Metre")
-with col5: closing = st.number_input("Closing Metre")
+    col4, col5 = st.columns(2)
+    with col4: opening = st.number_input("Opening Metre")
+    with col5: closing = st.number_input("Closing Metre")
 
-litres = max(closing-opening,0)
-price = current_fuel_price
-total = litres*price
-st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
+    litres = max(closing-opening,0)
+    price = current_fuel_price
+    total = litres*price
+    st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
-# Duty
-duty_in = st.time_input("Duty IN")
-duty_out = st.time_input("Duty OUT")
-in_time = datetime.combine(date.today(), duty_in)
-out_time = datetime.combine(date.today(), duty_out)
-hours = max((out_time-in_time).total_seconds()/3600,0)
+    # Duty
+    duty_in = st.time_input("Duty IN")
+    duty_out = st.time_input("Duty OUT")
+    in_time = datetime.combine(date.today(), duty_in)
+    out_time = datetime.combine(date.today(), duty_out)
+    hours = max((out_time-in_time).total_seconds()/3600,0)
 
-ip_address = socket.gethostbyname(socket.gethostname())
+    ip_address = socket.gethostbyname(socket.gethostname())
 
-if st.button("Save Entry"):
-    cursor.execute("""
-    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """,(str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-         str(duty_in), str(duty_out), hours, ip_address))
-    conn.commit()
-    st.success("Data Saved")
-    st.session_state.rerun_flag=True
+    if st.button("Save Entry"):
+        cursor.execute("""
+        INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,(str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+             str(duty_in), str(duty_out), hours, ip_address))
+        conn.commit()
+        st.success("Data Saved")
+        st.session_state.rerun_flag=True
 
 # ---------------- LOAD SALES DATA ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
@@ -158,6 +164,7 @@ if st.sidebar.button("Login"):
     else:
         st.sidebar.error("Invalid Login")
 
+# ---------------- ADMIN CONTROLS ----------------
 if st.session_state.admin_logged:
     st.sidebar.button("Logout", on_click=lambda: st.session_state.update({"admin_logged":False, "rerun_flag":True}))
 
