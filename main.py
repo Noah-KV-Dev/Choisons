@@ -5,13 +5,27 @@ from datetime import date, datetime
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+
+# ---------------- THEME / STYLE ----------------
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600&display=swap');
+html,body,[class*="css"]{
+font-family:'Lexend',sans-serif;
+color:black;
+}
+.stApp{
+background-color:#ff6f00;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("⛽ Choisons Petrol Pump Management System")
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Create tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 date TEXT,
@@ -67,8 +81,6 @@ Created by Nazeeh
 
 # ---------------- STAFF SALES ENTRY ----------------
 st.subheader("Sales Entry")
-
-# Staff selection
 col1, col2, col3 = st.columns(3)
 with col1:
     if len(staff_list)==0:
@@ -81,11 +93,11 @@ with col2:
 with col3:
     fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_select")
 
-# ---------------- FUEL PRICE CHANGE IN SALES ENTRY ----------------
+# ---------------- FUEL PRICE CHANGE FOR STAFF ----------------
 st.subheader("Fuel Price Override (Optional)")
 colp1, colp2 = st.columns([2,1])
 with colp1:
-    fuel_price_override = st.number_input(f"Set {fuel} Price (Leave blank to use default)", 
+    fuel_price_override = st.number_input(f"Set {fuel} Price (Leave blank for default)", 
                                           min_value=0.0, value=price_dict.get(fuel,0), key="fuel_override")
 with colp2:
     if st.button("Update Price for This Entry", key="update_price_staff"):
@@ -100,7 +112,6 @@ nozzle = st.selectbox("Nozzle",
                        "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"], 
                       key="nozzle_select")
 
-# Auto opening metre
 last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
                    conn, params=(nozzle,))
 default_opening = float(last.iloc[0]["closing"]) if len(last)>0 else 0.0
@@ -165,6 +176,16 @@ st.dataframe(staff_hours)
 st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
+
+# ---------------- MONTHLY SUMMARY PER STAFF ----------------
+st.subheader("Monthly Summary Per Staff")
+df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+monthly_summary = df.groupby(['month','staff']).agg({
+    'litres':'sum',
+    'total':'sum',
+    'hours':'sum'
+}).reset_index()
+st.dataframe(monthly_summary)
 
 # ---------------- ADMIN PANEL ----------------
 st.sidebar.title("Admin Panel")
