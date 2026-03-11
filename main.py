@@ -207,19 +207,16 @@ daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
     "total":"sum",
     "hours":"sum"
 }).reset_index()
-daily_summary["Staff Summary"] = daily_summary["staff"] + " - " + daily_summary["fuel"]
 st.dataframe(daily_summary)
 
-# ---------------- DAILY METRICS ----------------
-st.subheader("Daily Metrics")
-today_data = df[df["date"]==today]
-st.metric("Litres Today", round(today_data["litres"].sum(),2))
-st.metric("Sales Today", round(today_data["total"].sum(),2))
-
-# ---------------- NOZZLE SALES ----------------
-st.subheader("Nozzle Sales")
-nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
-st.dataframe(nozzle_sales)
+# ---------------- DAILY STAFF SUMMARY ----------------
+st.subheader("DAILY STAFF SUMMARY")
+daily_staff_summary = df[df['date']==today].groupby(["staff"]).agg({
+    "litres":"sum",
+    "total":"sum",
+    "hours":"sum"
+}).reset_index()
+st.dataframe(daily_staff_summary)
 
 # ---------------- MONTHLY SUMMARY ----------------
 st.subheader("MONTHLY SUMMARY")
@@ -231,5 +228,39 @@ monthly_summary = df.groupby(['month','staff','fuel']).agg({
     'hours':'sum'
 }).reset_index()
 monthly_summary['month'] = monthly_summary['month'].astype(str)
-monthly_summary["Staff Summary"] = monthly_summary["staff"] + " - " + monthly_summary["fuel"]
 st.dataframe(monthly_summary)
+
+# ---------------- MONTHLY STAFF SUMMARY ----------------
+st.subheader("MONTHLY STAFF SUMMARY")
+monthly_staff_summary = df.groupby(['month','staff']).agg({
+    'litres':'sum',
+    'total':'sum',
+    'hours':'sum'
+}).reset_index()
+monthly_staff_summary['month'] = monthly_staff_summary['month'].astype(str)
+st.dataframe(monthly_staff_summary)
+
+# ---------------- STAFF SEARCH / SUMMARY ----------------
+st.subheader("Staff Search / Summary")
+if len(staff_list)>0:
+    staff_search = st.selectbox("Select Staff to View Summary", staff_list, key="staff_search")
+    
+    # Daily for selected staff
+    staff_daily = df[(df['date']==today) & (df['staff']==staff_search)]
+    if not staff_daily.empty:
+        st.markdown(f"**Daily Details for {staff_search}:**")
+        st.dataframe(staff_daily)
+    else:
+        st.info(f"No sales today for {staff_search}")
+    
+    # Monthly for selected staff
+    staff_month = df[df['staff']==staff_search].groupby(['month','fuel']).agg({
+        'litres':'sum',
+        'total':'sum',
+        'hours':'sum'
+    }).reset_index()
+    if not staff_month.empty:
+        st.markdown(f"**Monthly Summary for {staff_search}:**")
+        st.dataframe(staff_month)
+    else:
+        st.info(f"No monthly records for {staff_search}")
