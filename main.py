@@ -43,12 +43,8 @@ duty_out TEXT,
 hours REAL
 )
 """)
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS staff(name TEXT)
-""")
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)
-""")
+cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
 conn.commit()
 
 # Default fuel prices
@@ -70,6 +66,62 @@ Email: kvpnaseeh@gmail.com
 Created by Nazeeh
 """)
 
+# ---------------- ADMIN PANEL ----------------
+st.sidebar.title("Admin Panel")
+admin_user = "admin"
+admin_pass = "admin123"
+if "admin_logged" not in st.session_state:
+    st.session_state.admin_logged=False
+
+username = st.sidebar.text_input("Username", key="admin_username")
+password = st.sidebar.text_input("Password", type="password", key="admin_password")
+if st.sidebar.button("Login", key="admin_login"):
+    if username==admin_user and password==admin_pass:
+        st.session_state.admin_logged=True
+        st.sidebar.success("Admin Logged In")
+    else:
+        st.sidebar.error("Invalid Login")
+
+if st.session_state.admin_logged:
+    st.sidebar.success("Admin Mode Active")
+    if st.sidebar.button("Logout", key="admin_logout"):
+        st.session_state.admin_logged=False
+        st.rerun()
+    st.subheader("Admin Controls")
+
+    # Add staff
+    new_staff = st.text_input("Add Staff", key="add_staff_input")
+    if st.button("Add Staff", key="add_staff_btn"):
+        cursor.execute("INSERT INTO staff VALUES(?)", (new_staff,))
+        conn.commit()
+        st.success("Staff Added")
+        st.rerun()
+
+    # Delete record
+    record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
+    if st.button("Delete Record", key="delete_record_btn"):
+        cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
+        conn.commit()
+        st.warning("Record Deleted")
+        st.rerun()
+
+    # Delete all data
+    if st.button("Delete All Data", key="delete_all_btn"):
+        cursor.execute("DELETE FROM sales")
+        conn.commit()
+        st.error("All Data Deleted")
+        st.rerun()
+
+    # Admin fuel price change
+    st.subheader("Admin Fuel Price Update")
+    fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
+    price_admin = st.number_input(f"Set Price for " + fuel_admin, min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
+    if price_admin != price_dict.get(fuel_admin):
+        price_dict[fuel_admin] = price_admin
+        cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
+        conn.commit()
+        st.success(f"{fuel_admin} price updated to ₹{price_admin}")
+
 # ---------------- STAFF SALES ENTRY ----------------
 st.subheader("Sales Entry")
 col1, col2, col3 = st.columns(3)
@@ -84,16 +136,8 @@ with col2:
 with col3:
     fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_select")
 
-# ---------------- FUEL PRICE OVERRIDE AUTO-SAVE ----------------
-st.subheader("Fuel Price Override (Optional)")
-fuel_price_override = st.number_input(f"Set {fuel} Price (Leave blank for default)", 
-                                      min_value=0.0, value=price_dict.get(fuel,0), key="fuel_override")
-# Auto save staff fuel price override
-if fuel_price_override != price_dict.get(fuel):
-    price_dict[fuel] = fuel_price_override
-    cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (fuel_price_override,fuel))
-    conn.commit()
-    st.success(f"{fuel} price auto-saved to ₹{fuel_price_override}")
+# Staff cannot override fuel price, use current price
+price = price_dict.get(fuel,0)
 
 # ---------------- NOZZLE AND METRES ----------------
 nozzle = st.selectbox("Nozzle", 
@@ -123,7 +167,6 @@ st.info(f"Work Hours: {round(hours,2)} hrs")
 
 # ---------------- CALCULATIONS ----------------
 litres = max(closing - opening, 0)
-price = price_dict.get(fuel, 0)
 total = litres * price
 st.success(f"Litres Sold: {round(litres,2)} L")
 st.success(f"Total Sale: ₹ {round(total,2)}")
@@ -173,59 +216,3 @@ monthly_summary = df.groupby(['month','staff']).agg({
 }).reset_index()
 monthly_summary['month'] = monthly_summary['month'].astype(str)
 st.dataframe(monthly_summary)
-
-# ---------------- ADMIN PANEL ----------------
-st.sidebar.title("Admin Panel")
-admin_user = "admin"
-admin_pass = "admin123"
-if "admin_logged" not in st.session_state:
-    st.session_state.admin_logged=False
-
-username = st.sidebar.text_input("Username", key="admin_username")
-password = st.sidebar.text_input("Password", type="password", key="admin_password")
-if st.sidebar.button("Login", key="admin_login"):
-    if username==admin_user and password==admin_pass:
-        st.session_state.admin_logged=True
-        st.sidebar.success("Admin Logged In")
-    else:
-        st.sidebar.error("Invalid Login")
-
-if st.session_state.admin_logged:
-    st.sidebar.success("Admin Mode Active")
-    if st.sidebar.button("Logout", key="admin_logout"):
-        st.session_state.admin_logged=False
-        st.rerun()
-    st.subheader("Admin Controls")
-
-    # Add staff
-    new_staff = st.text_input("Add Staff", key="add_staff_input")
-    if st.button("Add Staff", key="add_staff_btn"):
-        cursor.execute("INSERT INTO staff VALUES(?)", (new_staff,))
-        conn.commit()
-        st.success("Staff Added")
-        st.rerun()
-
-    # Delete record
-    record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
-    if st.button("Delete Record", key="delete_record_btn"):
-        cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
-        conn.commit()
-        st.warning("Record Deleted")
-        st.rerun()
-
-    # Delete all data
-    if st.button("Delete All Data", key="delete_all_btn"):
-        cursor.execute("DELETE FROM sales")
-        conn.commit()
-        st.error("All Data Deleted")
-        st.rerun()
-
-    # Admin fuel price change (auto-save)
-    st.subheader("Admin Fuel Price Update")
-    fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
-    price_admin = st.number_input(f"Set {fuel_admin} Price", min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
-    if price_admin != price_dict.get(fuel_admin):
-        price_dict[fuel_admin] = price_admin
-        cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
-        conn.commit()
-        st.success(f"{fuel_admin} price auto-saved to ₹{price_admin}")
