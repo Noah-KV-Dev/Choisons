@@ -7,7 +7,7 @@ from datetime import date, datetime
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 st.title("⛽ Choisons Petrol Pump Management System")
 
-# ---------------- DATABASE SETUP ----------------
+# ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -43,7 +43,6 @@ fuel TEXT,
 price REAL
 )
 """)
-
 conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
@@ -73,11 +72,11 @@ Created by Nazeeh
 st.subheader("Fuel Price Update")
 colp1, colp2, colp3 = st.columns(3)
 with colp1:
-    fuel_change = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+    fuel_change = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_price_update")
 with colp2:
-    new_price = st.number_input("New Price", min_value=0.0)
+    new_price = st.number_input("New Price", min_value=0.0, key="new_price_input")
 with colp3:
-    if st.button("Update Price"):
+    if st.button("Update Fuel Price", key="update_price_btn"):
         cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (new_price,fuel_change))
         conn.commit()
         st.success("Fuel Price Updated")
@@ -87,9 +86,9 @@ with colp3:
 st.subheader("Staff Duty Time")
 col1, col2 = st.columns(2)
 with col1:
-    duty_in = st.time_input("Duty IN")
+    duty_in = st.time_input("Duty IN", key="duty_in")
 with col2:
-    duty_out = st.time_input("Duty OUT")
+    duty_out = st.time_input("Duty OUT", key="duty_out")
 
 in_time = datetime.combine(date.today(), duty_in)
 out_time = datetime.combine(date.today(), duty_out)
@@ -105,15 +104,15 @@ with col3:
         st.warning("Admin must add staff first")
         staff=""
     else:
-        staff = st.selectbox("Staff Name", staff_list)
+        staff = st.selectbox("Staff Name", staff_list, key="sales_staff")
 with col4:
-    entry_date = st.date_input("Date", date.today())
+    entry_date = st.date_input("Date", date.today(), key="sales_date")
 with col5:
-    fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+    fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="sales_fuel_type")
 
 # Nozzle Selection
 nozzle = st.selectbox("Nozzle", ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
-                                 "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"])
+                                 "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"], key="sales_nozzle")
 
 # Auto-opening metre per nozzle
 last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
@@ -121,9 +120,9 @@ last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC
 default_opening = float(last.iloc[0]["closing"]) if len(last)>0 else 0.0
 col6, col7 = st.columns(2)
 with col6:
-    opening = st.number_input("Opening Metre", value=default_opening)
+    opening = st.number_input("Opening Metre", value=default_opening, key="sales_opening")
 with col7:
-    closing = st.number_input("Closing Metre", min_value=0.0)
+    closing = st.number_input("Closing Metre", min_value=0.0, key="sales_closing")
 
 # ---------------- CALCULATIONS ----------------
 litres = closing - opening
@@ -134,7 +133,7 @@ st.success(f"Litres Sold: {round(litres,2)} L")
 st.success(f"Total Sale: ₹ {round(total,2)}")
 
 # ---------------- SAVE ENTRY ----------------
-if st.button("Save Entry"):
+if st.button("Save Entry", key="save_entry_btn"):
     if staff=="":
         st.error("Add staff first")
     else:
@@ -180,9 +179,9 @@ admin_pass = "admin123"
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged=False
 
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password",type="password")
-if st.sidebar.button("Login"):
+username = st.sidebar.text_input("Username", key="admin_username")
+password = st.sidebar.text_input("Password",type="password", key="admin_password")
+if st.sidebar.button("Login", key="admin_login_btn"):
     if username==admin_user and password==admin_pass:
         st.session_state.admin_logged=True
         st.sidebar.success("Admin Logged In")
@@ -192,29 +191,29 @@ if st.sidebar.button("Login"):
 # ---------------- ADMIN CONTROLS ----------------
 if st.session_state.admin_logged:
     st.sidebar.success("Admin Mode Active")
-    if st.sidebar.button("Logout"):
+    if st.sidebar.button("Logout", key="admin_logout_btn"):
         st.session_state.admin_logged=False
         st.rerun()
     st.subheader("Admin Controls")
 
     # Add Staff
-    new_staff = st.text_input("Add Staff")
-    if st.button("Add Staff"):
+    new_staff = st.text_input("Add Staff", key="add_staff_input")
+    if st.button("Add Staff", key="add_staff_btn"):
         cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
         conn.commit()
         st.success("Staff Added")
         st.rerun()
 
     # Delete Record
-    record_id = st.selectbox("Delete Record", df["rowid"])
-    if st.button("Delete Record"):
+    record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
+    if st.button("Delete Record", key="delete_record_btn"):
         cursor.execute("DELETE FROM sales WHERE rowid=?",(record_id,))
         conn.commit()
         st.warning("Record Deleted")
         st.rerun()
 
     # Delete All Data
-    if st.button("Delete All Data"):
+    if st.button("Delete All Data", key="delete_all_btn"):
         cursor.execute("DELETE FROM sales")
         conn.commit()
         st.error("All Data Deleted")
