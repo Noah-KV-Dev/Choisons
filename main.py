@@ -112,11 +112,11 @@ if st.session_state.admin_logged:
         st.error("All Data Deleted")
         st.rerun()
 
-    # Admin fuel price change
+    # Admin fuel price change (normal save)
     st.subheader("Admin Fuel Price Update")
     fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
     price_admin = st.number_input(f"Set Price for " + fuel_admin, min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
-    if price_admin != price_dict.get(fuel_admin):
+    if st.button("Save Fuel Price", key="save_fuel_btn"):
         price_dict[fuel_admin] = price_admin
         cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
         conn.commit()
