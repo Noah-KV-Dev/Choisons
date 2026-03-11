@@ -4,7 +4,7 @@ import sqlite3
 from datetime import date, datetime
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Choisons Petrol Pump"import streamlit as st
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 import pandas as pd
 import sqlite3
 from datetime import date, datetime
