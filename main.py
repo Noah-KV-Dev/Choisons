@@ -234,17 +234,23 @@ if st.session_state.admin_logged:
                 st.success("Record updated")
                 st.session_state.rerun_flag=True
 
-# ---------------- SALES RECORDS (BOTTOM OF PAGE) ----------------
-st.subheader("Sales Records")
-st.dataframe(df,use_container_width=True)
+    # ---------------- SEARCH DAILY SALES (ADMIN ONLY) ----------------
+    st.subheader("Search Daily Sales Records")
+    search_date = st.date_input("Select Date", date.today(), key="search_date")
+    search_data = df[df["date"]==str(search_date)]
+    st.write(f"Sales Records for {search_date}:")
+    st.dataframe(search_data,use_container_width=True)
+    st.metric("Litres Sold", round(search_data["litres"].sum(),2))
+    st.metric("Total Sales", round(search_data["total"].sum(),2))
 
-st.subheader("Search Daily Sales Records")
-search_date = st.date_input("Select Date to Search", date.today())
-search_data = df[df["date"]==str(search_date)]
-st.write(f"Sales Records for {search_date}:")
-st.dataframe(search_data,use_container_width=True)
-st.metric("Litres Sold", round(search_data["litres"].sum(),2))
-st.metric("Total Sales", round(search_data["total"].sum(),2))
+    # ---------------- SEARCH STAFF-WISE SALES (ADMIN ONLY) ----------------
+    st.subheader("Search Staff-wise Sales Records")
+    selected_staff = st.selectbox("Select Staff", staff_list, key="search_staff")
+    staff_data = df[df["staff"]==selected_staff]
+    st.write(f"Sales Records for Staff: {selected_staff}")
+    st.dataframe(staff_data,use_container_width=True)
+    st.metric("Litres Sold", round(staff_data["litres"].sum(),2))
+    st.metric("Total Sales", round(staff_data["total"].sum(),2))
 
 # ---------------- SAFE RERUN ----------------
 if st.session_state.rerun_flag:
