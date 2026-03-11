@@ -53,11 +53,15 @@ for f, p in [('Petrol',100), ('Diesel',90), ('Power Petrol',105)]:
 conn.commit()
 
 # Load data
-df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-staff_df = pd.read_sql("SELECT * FROM staff", conn)
-price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
-staff_list = staff_df["name"].tolist()
-price_dict = dict(zip(price_df["fuel"], price_df["price"]))
+def load_data():
+    df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+    staff_df = pd.read_sql("SELECT * FROM staff", conn)
+    price_df = pd.read_sql("SELECT * FROM fuel_price", conn)
+    staff_list = staff_df["name"].tolist()
+    price_dict = dict(zip(price_df["fuel"], price_df["price"]))
+    return df, staff_list, price_dict
+
+df, staff_list, price_dict = load_data()
 
 # ---------------- CONTACT INFO ----------------
 st.info("""
@@ -86,7 +90,7 @@ if st.session_state.admin_logged:
     st.sidebar.success("Admin Mode Active")
     if st.sidebar.button("Logout", key="admin_logout"):
         st.session_state.admin_logged=False
-        st.rerun()
+        st.experimental_rerun()
     st.subheader("Admin Controls")
 
     # Add staff
@@ -95,7 +99,8 @@ if st.session_state.admin_logged:
         cursor.execute("INSERT INTO staff VALUES(?)", (new_staff,))
         conn.commit()
         st.success("Staff Added")
-        st.rerun()
+        df, staff_list, price_dict = load_data()
+        st.experimental_rerun()
 
     # Delete record
     record_id = st.selectbox("Delete Record", df["rowid"], key="delete_record_select")
@@ -103,24 +108,35 @@ if st.session_state.admin_logged:
         cursor.execute("DELETE FROM sales WHERE rowid=?", (record_id,))
         conn.commit()
         st.warning("Record Deleted")
-        st.rerun()
+        df, staff_list, price_dict = load_data()
+        st.experimental_rerun()
 
     # Delete all data
     if st.button("Delete All Data", key="delete_all_btn"):
         cursor.execute("DELETE FROM sales")
         conn.commit()
         st.error("All Data Deleted")
-        st.rerun()
+        df, staff_list, price_dict = load_data()
+        st.experimental_rerun()
 
-    # Admin fuel price change (normal save)
+    # Admin fuel price change (update all records)
     st.subheader("Admin Fuel Price Update")
     fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
     price_admin = st.number_input(f"Set Price for " + fuel_admin, min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
     if st.button("Save Fuel Price", key="save_fuel_btn"):
-        price_dict[fuel_admin] = price_admin
+        # Update fuel price table
         cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
+        # Update all past sales for this fuel
+        cursor.execute("""
+            UPDATE sales 
+            SET price = ?, 
+                total = litres * ?
+            WHERE fuel = ?
+        """, (price_admin, price_admin, fuel_admin))
         conn.commit()
-        st.success(f"{fuel_admin} price updated to ₹{price_admin}")
+        st.success(f"{fuel_admin} price updated to ₹{price_admin} for all records")
+        df, staff_list, price_dict = load_data()
+        st.experimental_rerun()
 
 # ---------------- STAFF SALES ENTRY ----------------
 st.subheader("Sales Entry")
@@ -134,19 +150,16 @@ with col1:
 with col2:
     entry_date = st.date_input("Date", date.today(), key="date_entry")
 with col3:
-    # Show fuel price in selectbox
     fuel_display = [f"{f} (₹{price_dict[f]})" for f in ["Petrol","Diesel","Power Petrol"]]
     fuel_choice = st.selectbox("Fuel Type", fuel_display, key="fuel_select")
-    fuel = fuel_choice.split(" ")[0]  # extract fuel name
+    fuel = fuel_choice.split(" ")[0]
 price = price_dict.get(fuel,0)
 
-# ---------------- NOZZLE AND METRES ----------------
+# Nozzle & Metres
 nozzle = st.selectbox("Nozzle", 
                       ["Nozzle 1","Nozzle 2","Nozzle 3","Nozzle 4","Nozzle 5",
                        "Nozzle 6","Nozzle 7","Nozzle 8","Nozzle 9","Nozzle 10"], 
                       key="nozzle_select")
-
-# Auto-open = last closing of this nozzle
 last = pd.read_sql("SELECT closing FROM sales WHERE nozzle=? ORDER BY rowid DESC LIMIT 1",
                    conn, params=(nozzle,))
 default_opening = float(last.iloc[0]["closing"]) if len(last)>0 else 0.0
@@ -156,7 +169,7 @@ with col4:
 with col5:
     closing = st.number_input("Closing Metre", min_value=0.0, key="closing")
 
-# ---------------- DUTY HOURS ----------------
+# Duty Hours
 col6, col7 = st.columns(2)
 with col6:
     duty_in = st.time_input("Duty IN", key="duty_in")
@@ -167,7 +180,7 @@ out_time = datetime.combine(date.today(), duty_out)
 hours = max((out_time - in_time).total_seconds()/3600, 0)
 st.info(f"Work Hours: {round(hours,2)} hrs")
 
-# ---------------- VALIDATION ----------------
+# Validation
 if closing < opening:
     st.error("Closing metre cannot be less than opening metre!")
     save_allowed = False
@@ -176,13 +189,13 @@ else:
         st.warning("Closing metre is unusually high compared to last closing metre!")
     save_allowed = True
 
-# ---------------- CALCULATIONS ----------------
+# Calculations
 litres = max(closing - opening, 0)
 total = litres * price
 st.success(f"Litres Sold: {round(litres,2)} L")
 st.success(f"Total Sale: ₹ {round(total,2)}")
 
-# ---------------- SAVE ENTRY ----------------
+# Save Entry
 if st.button("Save Entry", key="save_entry"):
     if staff=="":
         st.error("Add staff first")
@@ -194,12 +207,15 @@ if st.button("Save Entry", key="save_entry"):
         """, (str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
               str(duty_in), str(duty_out), hours))
         conn.commit()
+        df, staff_list, price_dict = load_data()
         st.success("Data Saved")
-        st.rerun()
+        st.experimental_rerun()
 
-# ---------------- DAILY SUMMARY ----------------
+# ---------------- SUMMARIES ----------------
+df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+
+# Daily Summary
 st.subheader("DAILY SUMMARY")
-df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 today = str(date.today())
 daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
     "price":"first",
@@ -209,7 +225,7 @@ daily_summary = df[df['date']==today].groupby(["staff","fuel"]).agg({
 }).reset_index()
 st.dataframe(daily_summary)
 
-# ---------------- DAILY STAFF SUMMARY ----------------
+# Daily Staff Summary
 st.subheader("DAILY STAFF SUMMARY")
 daily_staff_summary = df[df['date']==today].groupby(["staff"]).agg({
     "litres":"sum",
@@ -218,9 +234,8 @@ daily_staff_summary = df[df['date']==today].groupby(["staff"]).agg({
 }).reset_index()
 st.dataframe(daily_staff_summary)
 
-# ---------------- MONTHLY SUMMARY ----------------
+# Monthly Summary
 st.subheader("MONTHLY SUMMARY")
-df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
 monthly_summary = df.groupby(['month','staff','fuel']).agg({
     "price":"first",
     'litres':'sum',
@@ -230,7 +245,7 @@ monthly_summary = df.groupby(['month','staff','fuel']).agg({
 monthly_summary['month'] = monthly_summary['month'].astype(str)
 st.dataframe(monthly_summary)
 
-# ---------------- MONTHLY STAFF SUMMARY ----------------
+# Monthly Staff Summary
 st.subheader("MONTHLY STAFF SUMMARY")
 monthly_staff_summary = df.groupby(['month','staff']).agg({
     'litres':'sum',
@@ -240,12 +255,10 @@ monthly_staff_summary = df.groupby(['month','staff']).agg({
 monthly_staff_summary['month'] = monthly_staff_summary['month'].astype(str)
 st.dataframe(monthly_staff_summary)
 
-# ---------------- STAFF SEARCH / SUMMARY ----------------
+# Staff Search / Summary
 st.subheader("Staff Search / Summary")
 if len(staff_list)>0:
     staff_search = st.selectbox("Select Staff to View Summary", staff_list, key="staff_search")
-    
-    # Daily for selected staff
     staff_daily = df[(df['date']==today) & (df['staff']==staff_search)]
     if not staff_daily.empty:
         st.markdown(f"**Daily Details for {staff_search}:**")
@@ -253,7 +266,6 @@ if len(staff_list)>0:
     else:
         st.info(f"No sales today for {staff_search}")
     
-    # Monthly for selected staff
     staff_month = df[df['staff']==staff_search].groupby(['month','fuel']).agg({
         'litres':'sum',
         'total':'sum',
