@@ -4,13 +4,8 @@ import sqlite3
 from datetime import date, datetime
 import socket
 
-# ---------------- MODE ----------------
-mode = st.sidebar.radio("Mode", ["Offline", "Online"])
-if mode == "Offline":
-    conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
-else:
-    conn = sqlite3.connect("/tmp/petrol_sales.db", check_same_thread=False)
-
+# ---------------- DATABASE ----------------
+conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
 # ---------------- TABLES ----------------
@@ -28,7 +23,6 @@ CREATE TABLE IF NOT EXISTS sales(
     duty_in TEXT,
     duty_out TEXT,
     hours REAL,
-    website_type TEXT,
     ip_address TEXT
 )
 """)
@@ -114,16 +108,15 @@ total = litres * price
 st.success(f"Litres Sold: {round(litres,2)} L")
 st.success(f"Total Sale: ₹ {round(total,2)}")
 
-website_type = mode
 ip_address = socket.gethostbyname(socket.gethostname())
 
 if st.button("Save Entry"):
     cursor.execute("""
-    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         str(entry_date), staff, fuel, nozzle, opening, closing,
         litres, price, total, str(duty_in), str(duty_out),
-        hours, website_type, ip_address
+        hours, ip_address
     ))
     conn.commit()
     st.success("Data Saved")
