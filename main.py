@@ -26,6 +26,7 @@ st.title("⛽ Choisons Petrol Pump Management System")
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
+# Create tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 date TEXT,
@@ -42,28 +43,18 @@ duty_out TEXT,
 hours REAL
 )
 """)
-
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS staff(
-name TEXT
-)
+CREATE TABLE IF NOT EXISTS staff(name TEXT)
 """)
-
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS fuel_price(
-fuel TEXT,
-price REAL
-)
+CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)
 """)
 conn.commit()
 
 # Default fuel prices
-cursor.execute("SELECT COUNT(*) FROM fuel_price")
-if cursor.fetchone()[0]==0:
-    cursor.execute("INSERT INTO fuel_price VALUES('Petrol',100)")
-    cursor.execute("INSERT INTO fuel_price VALUES('Diesel',90)")
-    cursor.execute("INSERT INTO fuel_price VALUES('Power Petrol',105)")
-    conn.commit()
+for f, p in [('Petrol',100), ('Diesel',90), ('Power Petrol',105)]:
+    cursor.execute("INSERT OR IGNORE INTO fuel_price(fuel,price) VALUES (?,?)", (f,p))
+conn.commit()
 
 # Load data
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
@@ -93,18 +84,16 @@ with col2:
 with col3:
     fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"], key="fuel_select")
 
-# ---------------- FUEL PRICE CHANGE FOR STAFF ----------------
+# ---------------- FUEL PRICE OVERRIDE AUTO-SAVE ----------------
 st.subheader("Fuel Price Override (Optional)")
-colp1, colp2 = st.columns([2,1])
-with colp1:
-    fuel_price_override = st.number_input(f"Set {fuel} Price (Leave blank for default)", 
-                                          min_value=0.0, value=price_dict.get(fuel,0), key="fuel_override")
-with colp2:
-    if st.button("Update Price for This Entry", key="update_price_staff"):
-        price_dict[fuel] = fuel_price_override
-        cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (fuel_price_override,fuel))
-        conn.commit()
-        st.success(f"{fuel} price updated to ₹{fuel_price_override}")
+fuel_price_override = st.number_input(f"Set {fuel} Price (Leave blank for default)", 
+                                      min_value=0.0, value=price_dict.get(fuel,0), key="fuel_override")
+# Auto save staff fuel price override
+if fuel_price_override != price_dict.get(fuel):
+    price_dict[fuel] = fuel_price_override
+    cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (fuel_price_override,fuel))
+    conn.commit()
+    st.success(f"{fuel} price auto-saved to ₹{fuel_price_override}")
 
 # ---------------- NOZZLE AND METRES ----------------
 nozzle = st.selectbox("Nozzle", 
@@ -152,18 +141,16 @@ if st.button("Save Entry", key="save_entry"):
         st.success("Data Saved")
         st.rerun()
 
-# ---------------- DATA TABLES AND SUMMARIES ----------------
+# ---------------- DAILY, STAFF, NOZZLE ----------------
 st.subheader("Sales Records")
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 st.dataframe(df,use_container_width=True)
 
-# Daily summary
 st.subheader("Daily Sales Summary")
 today_data = df[df["date"]==str(date.today())]
 st.metric("Litres Today", round(today_data["litres"].sum(),2))
 st.metric("Sales Today", round(today_data["total"].sum(),2))
 
-# Staff litres and hours
 st.subheader("Staff Total Litres")
 staff_litres = df.groupby("staff")["litres"].sum().reset_index()
 st.dataframe(staff_litres)
@@ -172,12 +159,11 @@ st.subheader("Staff Total Hours")
 staff_hours = df.groupby("staff")["hours"].sum().reset_index()
 st.dataframe(staff_hours)
 
-# Nozzle sales
 st.subheader("Nozzle Sales")
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
-# ---------------- MONTHLY SUMMARY PER STAFF ----------------
+# ---------------- MONTHLY SUMMARY ----------------
 st.subheader("Monthly Summary Per Staff")
 df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
 monthly_summary = df.groupby(['month','staff']).agg({
@@ -185,6 +171,7 @@ monthly_summary = df.groupby(['month','staff']).agg({
     'total':'sum',
     'hours':'sum'
 }).reset_index()
+monthly_summary['month'] = monthly_summary['month'].astype(str)
 st.dataframe(monthly_summary)
 
 # ---------------- ADMIN PANEL ----------------
@@ -233,15 +220,12 @@ if st.session_state.admin_logged:
         st.error("All Data Deleted")
         st.rerun()
 
-    # Admin fuel price change
+    # Admin fuel price change (auto-save)
     st.subheader("Admin Fuel Price Update")
-    cola, colb = st.columns(2)
-    with cola:
-        fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
-    with colb:
-        price_admin = st.number_input(f"Set {fuel_admin} Price", min_value=0.0, key="admin_price_input")
-    if st.button("Update Fuel Price", key="admin_update_price"):
+    fuel_admin = st.selectbox("Select Fuel", ["Petrol","Diesel","Power Petrol"], key="admin_fuel_select")
+    price_admin = st.number_input(f"Set {fuel_admin} Price", min_value=0.0, value=price_dict.get(fuel_admin,0), key="admin_price_input")
+    if price_admin != price_dict.get(fuel_admin):
+        price_dict[fuel_admin] = price_admin
         cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (price_admin, fuel_admin))
         conn.commit()
-        price_dict[fuel_admin] = price_admin
-        st.success(f"{fuel_admin} price updated to ₹{price_admin}")
+        st.success(f"{fuel_admin} price auto-saved to ₹{price_admin}")
