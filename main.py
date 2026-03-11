@@ -244,19 +244,17 @@ if st.session_state.admin_logged:
 
     st.subheader("⚠ Admin Controls")
 
-    record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
+record_id = st.selectbox("Select Record ID to Delete", df["rowid"])
 
-    if st.button("Delete Selected Record"):
+if st.button("Delete Selected Record"):
 
-        cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
-        conn.commit()
+   cursor.execute("DELETE FROM sales WHERE rowid = ?", (record_id,))
+   conn.commit()
+   st.warning("Record Deleted")
+   st.rerun()
+if st.button("Delete All Data"):
+   cursor.execute("DELETE FROM sales")
+   conn.commit()
 
-        st.warning("Record Deleted")
-        st.rerun()
-
-    if st.button("Delete All Data"):
-        cursor.execute("DELETE FROM sales")
-        conn.commit()
-
-        st.error("All Data Deleted")
-        st.rerun()
+   st.error("All Data Deleted")
+   st.rerun()
