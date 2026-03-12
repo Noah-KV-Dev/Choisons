@@ -8,7 +8,7 @@ import socket
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Sales table
+# Sales table (with vehicle_number)
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 date TEXT,
@@ -165,6 +165,11 @@ if st.button("Save Entry"):
 
 # ---------------- LOAD SALES ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+
+# Ensure all columns exist (for older entries)
+for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number"]:
+    if col not in df.columns:
+        df[col] = 0 if col != "vehicle_number" else ""
 
 # ---------------- DASHBOARD ----------------
 st.subheader("Dashboard Summary")
