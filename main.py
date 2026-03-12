@@ -86,9 +86,9 @@ creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
 df = load_data()
 
 # ---------------- SIDEBAR MENU ----------------
-menu_option = st.sidebar.selectbox("Menu", ["Sales Entry", "Reports & Summary", "Admin Panel"])
+menu_option = st.sidebar.selectbox("Menu", ["Sales Entry", "Reports & Summary"])
 
-# ---------------- ADMIN LOGIN ----------------
+# ---------------- ADMIN LOGIN (Sidebar) ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
 
@@ -145,11 +145,12 @@ if menu_option == "Sales Entry":
 
     creditor_name = ""
     vehicle_number = ""
-    if credit>0 and creditor_list:
-        creditor_name = st.selectbox("Select Creditor", creditor_list)
+    if credit>0:
+        if creditor_list:
+            creditor_name = st.selectbox("Select Creditor", creditor_list)
+        else:
+            st.warning("No creditors available. Admin must add creditors.")
         vehicle_number = st.text_input("Vehicle Number")
-    elif credit>0:
-        st.warning("No creditors available. Admin must add creditors.")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -167,12 +168,13 @@ if menu_option == "Sales Entry":
         conn.commit()
         st.success("Entry Saved")
         df = load_data()
+        st.experimental_rerun()
 
     # ---------------- DAILY SUMMARY ----------------
     st.subheader("Daily Summary (Per Staff)")
     daily_data = df[df["date"]==str(date.today())]
     if not daily_data.empty:
-        daily_summary = daily_data.groupby("staff")[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
+        daily_summary = daily_data.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
         st.dataframe(daily_summary)
     else:
         st.info("No sales today.")
@@ -183,7 +185,7 @@ if menu_option == "Sales Entry":
     month_period = pd.Period(str(date.today()), freq='M')
     monthly_data = df[df['month']==month_period]
     if not monthly_data.empty:
-        monthly_summary = monthly_data.groupby("staff")[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
+        monthly_summary = monthly_data.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
         st.dataframe(monthly_summary)
     else:
         st.info("No sales this month.")
@@ -200,60 +202,60 @@ elif menu_option == "Reports & Summary":
     st.dataframe(df[["paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().to_frame().T)
 
     st.subheader("Staff Summary")
-    staff_summary = df.groupby("staff")[["litres","total","hours","paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().reset_index()
+    staff_summary = df.groupby(["date","staff"])[["litres","total","hours","paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().reset_index()
     st.dataframe(staff_summary)
 
     st.subheader("Nozzle Sales")
-    nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
+    nozzle_sales = df.groupby(["date","nozzle"])["litres"].sum().reset_index()
     st.dataframe(nozzle_sales)
 
-    st.subheader("Creditors Outstanding")
+    st.subheader("Creditors Outstanding (with Vehicle Details)")
     credit_df = df[df["credit"]>0].copy()
     if not credit_df.empty:
-        credit_report = credit_df.groupby(["creditor_name","vehicle_number"])[["credit","balance_cash"]].sum().reset_index()
+        credit_report = credit_df[["date","staff","creditor_name","vehicle_number","credit","balance_cash"]]
+        st.dataframe(credit_report)
+        st.subheader("Vehicle-wise Credit Summary")
+        vehicle_summary = credit_df.groupby("vehicle_number")[["credit","balance_cash"]].sum().reset_index()
+        st.dataframe(vehicle_summary)
     else:
-        credit_report = pd.DataFrame(columns=["creditor_name","vehicle_number","credit","balance_cash"])
-    st.dataframe(credit_report)
+        st.info("No credit records found.")
 
     st.subheader("Monthly Summary")
-    monthly_summary = df.groupby('month')[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().reset_index()
+    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
     st.dataframe(monthly_summary)
 
-# ---------------- ADMIN PANEL ----------------
-if menu_option == "Admin Panel":
-    if st.session_state.logged_in_admin:
-        st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
-        st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
+# ---------------- ADMIN CONTROLS ----------------
+if st.session_state.logged_in_admin:
+    st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
+    st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
 
-        # Add Staff
-        st.subheader("Add Staff")
-        new_staff = st.text_input("Staff Name", key="new_staff")
-        if st.button("Add Staff"):
-            try:
-                cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
-                conn.commit()
-                st.success("Staff Added")
-            except:
-                st.error("Staff Exists")
+    # Add Staff
+    st.subheader("Add Staff")
+    new_staff = st.text_input("Staff Name", key="new_staff")
+    if st.button("Add Staff"):
+        try:
+            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+            conn.commit()
+            st.success("Staff Added")
+        except:
+            st.error("Staff Exists")
 
-        # Add Creditor
-        st.subheader("Add Creditor")
-        new_creditor = st.text_input("Creditor Name", key="new_creditor")
-        if st.button("Add Creditor"):
-            try:
-                cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
-                conn.commit()
-                st.success("Creditor Added")
-            except:
-                st.error("Creditor Exists")
+    # Add Creditor
+    st.subheader("Add Creditor")
+    new_creditor = st.text_input("Creditor Name", key="new_creditor")
+    if st.button("Add Creditor"):
+        try:
+            cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
+            conn.commit()
+            st.success("Creditor Added")
+        except:
+            st.error("Creditor Exists")
 
-        # Update Fuel Prices
-        st.subheader("Update Fuel Prices")
-        for fuel in ["Petrol","Diesel","Power Petrol"]:
-            new_price = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
-            if st.button(f"Update {fuel}"):
-                cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
-                conn.commit()
-                st.success(f"{fuel} price updated")
-    else:
-        st.info("Login as admin to access Admin Panel")
+    # Update Fuel Prices
+    st.subheader("Update Fuel Prices")
+    for fuel in ["Petrol","Diesel","Power Petrol"]:
+        new_price = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
+        if st.button(f"Update {fuel}"):
+            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+            conn.commit()
+            st.success(f"{fuel} price updated")
