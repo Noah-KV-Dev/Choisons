@@ -228,7 +228,8 @@ elif menu_option == "Reports & Summary":
     st.dataframe(monthly_summary)
 
 # ---------------- ADMIN CONTROLS ----------------
-if st.session_state.logged_in_admin:
+# Only visible for logged-in admin
+if st.session_state.get("logged_in_admin"):
     st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
     st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
 
