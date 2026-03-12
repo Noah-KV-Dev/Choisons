@@ -90,6 +90,8 @@ df = load_data()
 # ---------------- SESSION STATE ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
+if "sale_creditors" not in st.session_state:
+    st.session_state.sale_creditors = []  # For dynamic creditors per sale
 
 # ---------------- SIDEBAR MENU ----------------
 menu_options = ["Sales Entry", "Reports & Summary"]
@@ -151,25 +153,40 @@ if menu_option == "Sales Entry":
     balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit), 0)
     st.info(f"Balance Cash: ₹ {balance_cash}")
 
-    # ---------------- CREDITOR ENTRY ----------------
-    creditor_name = ""
-    vehicle_number = ""
-    if credit > 0:
-        st.subheader("Creditor Details")
-        existing_creditor = st.selectbox("Select Existing Creditor (optional)", ["--None--"] + creditor_list, key="staff_select_creditor")
-        new_creditor = st.text_input("Or Add New Creditor Name", key="staff_new_creditor")
-        vehicle_number = st.text_input("Vehicle Number", key="staff_vehicle_number")
-        
-        if new_creditor.strip() != "":
-            cursor.execute("SELECT COUNT(*) FROM creditors WHERE name=?", (new_creditor.strip(),))
+    # ---------------- DYNAMIC CREDITORS ----------------
+    st.subheader("Creditors for this Sale")
+    col1, col2 = st.columns([4,1])
+    with col1:
+        selected_creditor = st.selectbox("Select Existing Creditor", ["--None--"] + creditor_list, key="creditor_dropdown")
+    with col2:
+        add_new = st.button("➕", key="add_creditor_btn")  # plus button
+
+    # Add new creditor dynamically
+    if add_new:
+        new_creditor_name = st.text_input("Enter New Creditor Name", key="new_creditor_input")
+        new_vehicle = st.text_input("Vehicle Number", key="new_vehicle_input")
+        if new_creditor_name.strip() != "":
+            cursor.execute("SELECT COUNT(*) FROM creditors WHERE name=?", (new_creditor_name.strip(),))
             if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor.strip(),))
+                cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor_name.strip(),))
                 conn.commit()
-                st.success(f"New creditor '{new_creditor.strip()}' added.")
-                creditor_list.append(new_creditor.strip())
-            creditor_name = new_creditor.strip()
-        elif existing_creditor != "--None--":
-            creditor_name = existing_creditor
+                creditor_list.append(new_creditor_name.strip())
+                st.success(f"New creditor '{new_creditor_name.strip()}' added.")
+            st.session_state.sale_creditors.append({
+                "creditor_name": new_creditor_name.strip(),
+                "vehicle_number": new_vehicle.strip()
+            })
+
+    # Add selected existing creditor to list
+    if selected_creditor != "--None--" and st.button("Add Selected Creditor", key="add_existing_creditor_btn"):
+        st.session_state.sale_creditors.append({
+            "creditor_name": selected_creditor,
+            "vehicle_number": ""
+        })
+
+    # Show current creditors table
+    if st.session_state.sale_creditors:
+        st.table(pd.DataFrame(st.session_state.sale_creditors))
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -178,19 +195,28 @@ if menu_option == "Sales Entry":
     hours = max((out_time-in_time).total_seconds()/3600,0)
     ip_address = socket.gethostbyname(socket.gethostname())
 
+    # Save entry
     if st.button("Save Entry", key="save_sales_btn"):
-        cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
-            str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-            paytm, hp_pay, cash, credit, advance_paid, balance_cash, creditor_name,
-            str(duty_in), str(duty_out), hours, ip_address, vehicle_number
-        ))
+        if not st.session_state.sale_creditors:
+            # Save as normal sale without credit
+            cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+                paytm, hp_pay, cash, credit, advance_paid, balance_cash, "",
+                str(duty_in), str(duty_out), hours, ip_address, ""
+            ))
+        else:
+            for creditor in st.session_state.sale_creditors:
+                cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                    str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+                    paytm, hp_pay, cash, credit, advance_paid, balance_cash, creditor.get("creditor_name",""),
+                    str(duty_in), str(duty_out), hours, ip_address, creditor.get("vehicle_number","")
+                ))
         conn.commit()
         df = load_data()
+        st.session_state.sale_creditors = []  # Reset after saving
         st.success("Entry Saved Successfully!")
-        try:
-            st.experimental_rerun()
-        except:
-            pass
+        try: st.experimental_rerun()
+        except: pass
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
