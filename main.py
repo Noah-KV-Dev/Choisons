@@ -3,7 +3,6 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 import socket
-
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
