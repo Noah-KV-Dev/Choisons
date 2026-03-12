@@ -166,10 +166,19 @@ if st.button("Save Entry"):
 # ---------------- LOAD SALES ----------------
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
-# Ensure all columns exist (for older entries)
-for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number"]:
+# ---------------- ENSURE COLUMNS EXIST ----------------
+for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number","creditor_name"]:
     if col not in df.columns:
-        df[col] = 0 if col != "vehicle_number" else ""
+        df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
+# Fill NaN values
+df["paytm"] = df["paytm"].fillna(0)
+df["hp_pay"] = df["hp_pay"].fillna(0)
+df["cash"] = df["cash"].fillna(0)
+df["credit"] = df["credit"].fillna(0)
+df["advance_paid"] = df["advance_paid"].fillna(0)
+df["balance_cash"] = df["balance_cash"].fillna(0)
+df["vehicle_number"] = df["vehicle_number"].fillna("")
+df["creditor_name"] = df["creditor_name"].fillna("")
 
 # ---------------- DASHBOARD ----------------
 st.subheader("Dashboard Summary")
@@ -193,7 +202,11 @@ nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
 # ---------------- CREDITORS REPORT ----------------
-credit_report = df.groupby(["creditor_name","vehicle_number"])[["credit","balance_cash"]].sum().reset_index()
+credit_df = df[df["credit"]>0].copy()
+if not credit_df.empty:
+    credit_report = credit_df.groupby(["creditor_name","vehicle_number"])[["credit","balance_cash"]].sum().reset_index()
+else:
+    credit_report = pd.DataFrame(columns=["creditor_name","vehicle_number","credit","balance_cash"])
 st.subheader("Creditors Outstanding")
 st.dataframe(credit_report)
 
