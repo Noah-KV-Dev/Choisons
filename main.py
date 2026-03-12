@@ -237,7 +237,7 @@ elif page=="Staff Daily Checklist":
 elif page=="Admin Panel":
     st.title("Admin Panel")
 
-    # ------------------ STAFF MANAGEMENT ------------------
+    # ---------------- STAFF MANAGEMENT ----------------
     st.subheader("Staff Management")
     new_staff = st.text_input("Add New Staff")
     if st.button("Add Staff"):
@@ -259,128 +259,28 @@ elif page=="Admin Panel":
             conn.commit()
             st.success(f"Staff '{remove_staff}' Removed ✅")
 
-    # ------------------ FUEL MANAGEMENT ------------------
-    st.subheader("Fuel Management")
+    # ---------------- FUEL PRICE MANAGEMENT ----------------
+    st.subheader("Fuel Price Management")
     fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
     for index, row in fuel_df.iterrows():
-        fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
-        fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
-        if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
-            try:
-                cursor.execute(
-                    "UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",
-                    (fuel_name.strip(), fuel_price_val, row["fuel"])
-                )
+        fuel_name = row["fuel"]
+        fuel_price_val = st.number_input(f"{fuel_name} Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
+        if st.button(f"Update Price for {fuel_name}", key=f"update_fuel_{index}"):
+            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (fuel_price_val, fuel_name))
+            conn.commit()
+            st.success(f"Price for '{fuel_name}' updated to ₹{fuel_price_val} ✅")
+
+    # ---------------- DELETE SALES ENTRIES BY STAFF ----------------
+    st.subheader("Delete All Sales Entries by Staff")
+    if staff_list:
+        del_staff = st.selectbox("Select Staff to Delete All Sales Entries", staff_list)
+        confirm = st.checkbox("Confirm deletion of all entries for this staff")
+        if st.button(f"Delete All Sales for {del_staff}"):
+            if confirm:
+                cursor.execute("DELETE FROM sales WHERE staff=?",(del_staff,))
                 conn.commit()
-                st.success(f"Fuel '{row['fuel']}' Updated ✅")
-            except sqlite3.IntegrityError:
-                st.error("Fuel Name Already Exists ❌")
-
-    # ------------------ SALES ENTRY MANAGEMENT ------------------
-    st.subheader("Manage Sales Entries")
-
-    # Ensure sales table has 'id' column
-    existing_columns = [c[1] for c in cursor.execute("PRAGMA table_info(sales)").fetchall()]
-    if 'id' not in existing_columns:
-        # Add temporary id for existing rows
-        cursor.execute("ALTER TABLE sales ADD COLUMN temp_id INTEGER")
-        cursor.execute("UPDATE sales SET temp_id = rowid")
-        conn.commit()
-        cursor.execute("ALTER TABLE sales RENAME TO sales_old")
-        # Recreate sales table with proper id
-        cursor.execute("""
-        CREATE TABLE sales (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT,
-            staff TEXT,
-            opening REAL,
-            closing REAL,
-            fuel TEXT,
-            nozzle INTEGER DEFAULT 1,
-            litres REAL DEFAULT 0,
-            price REAL DEFAULT 0,
-            total REAL DEFAULT 0,
-            paytm REAL DEFAULT 0,
-            sbi REAL DEFAULT 0,
-            hppay REAL DEFAULT 0,
-            advance REAL DEFAULT 0,
-            creditor REAL DEFAULT 0,
-            balance REAL DEFAULT 0,
-            time_in TEXT DEFAULT '00:00',
-            time_out TEXT DEFAULT '00:00',
-            hours REAL DEFAULT 0
-        )
-        """)
-        cursor.execute("""
-        INSERT INTO sales(id,date,staff,opening,closing,fuel,nozzle,litres,price,total,
-                          paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours)
-        SELECT temp_id,date,staff,opening,closing,fuel,nozzle,litres,price,total,
-               paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours
-        FROM sales_old
-        """)
-        cursor.execute("DROP TABLE sales_old")
-        conn.commit()
-
-    # Load sales entries
-    try:
-        df_sales = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
-    except Exception as e:
-        st.error(f"Error loading sales table: {e}")
-        df_sales = pd.DataFrame()
-
-    if not df_sales.empty:
-        selected_id = st.selectbox("Select Sales Entry ID to Edit/Delete", df_sales["id"].tolist())
-        entry = df_sales[df_sales["id"]==selected_id].iloc[0]
-
-        st.write("### Current Entry Details")
-        st.write(entry)
-
-        # Editable fields
-        col1, col2 = st.columns(2)
-        with col1:
-            staff_edit = st.selectbox(
-                "Staff", staff_list,
-                index=staff_list.index(entry["staff"]) if entry["staff"] in staff_list else 0
-            )
-            fuel_edit = st.selectbox(
-                "Fuel", list(fuel_price.keys()),
-                index=list(fuel_price.keys()).index(entry["fuel"]) if entry["fuel"] in fuel_price else 0
-            )
-            nozzle_edit = st.number_input("Nozzle", min_value=1, max_value=12, value=int(entry["nozzle"]))
-            opening_edit = st.number_input("Opening Meter", value=float(entry["opening"]), step=0.01, format="%.2f")
-            closing_edit = st.number_input("Closing Meter", value=float(entry["closing"]), step=0.01, format="%.2f")
-        with col2:
-            paytm_edit = st.number_input("Paytm", value=float(entry["paytm"]), step=0.01)
-            sbi_edit = st.number_input("SBI", value=float(entry["sbi"]), step=0.01)
-            hppay_edit = st.number_input("HP Pay", value=float(entry["hppay"]), step=0.01)
-            advance_edit = st.number_input("Advance Paid", value=float(entry["advance"]), step=0.01)
-            creditor_edit = st.number_input("Creditor", value=float(entry["creditor"]), step=0.01)
-
-        # Recalculate derived fields
-        litres_edit = round(max(closing_edit - opening_edit,0),2)
-        total_edit = round(litres_edit * float(fuel_price[fuel_edit]),2)
-        balance_edit = round(total_edit - (paytm_edit + sbi_edit + hppay_edit + advance_edit + creditor_edit),2)
-        st.info(f"Litres: {litres_edit} | Total: ₹ {total_edit} | Balance: ₹ {balance_edit}")
-
-        # Update button
-        if st.button("Update Sales Entry"):
-            cursor.execute("""
-                UPDATE sales SET
-                staff=?, fuel=?, nozzle=?, opening=?, closing=?, litres=?, price=?, total=?,
-                paytm=?, sbi=?, hppay=?, advance=?, creditor=?, balance=?
-                WHERE id=?
-            """,(
-                staff_edit, fuel_edit, nozzle_edit, opening_edit, closing_edit, litres_edit, float(fuel_price[fuel_edit]), total_edit,
-                paytm_edit, sbi_edit, hppay_edit, advance_edit, creditor_edit, balance_edit,
-                selected_id
-            ))
-            conn.commit()
-            st.success("Sales Entry Updated ✅")
-
-        # Delete button
-        if st.button("Delete Sales Entry"):
-            cursor.execute("DELETE FROM sales WHERE id=?",(selected_id,))
-            conn.commit()
-            st.success("Sales Entry Deleted ✅")
+                st.success(f"All sales entries for '{del_staff}' have been deleted ✅")
+            else:
+                st.warning("Check the box to confirm deletion")
     else:
-        st.info("No sales entries available")
+        st.info("No staff available")
