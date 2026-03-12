@@ -236,6 +236,8 @@ elif page=="Staff Daily Checklist":
 # ---------------- ADMIN PANEL ----------------
 elif page=="Admin Panel":
     st.title("Admin Panel")
+
+    # --- Staff Management ---
     new_staff=st.text_input("Add Staff")
     if st.button("Add Staff"):
         try:
@@ -251,6 +253,8 @@ elif page=="Admin Panel":
             cursor.execute("DELETE FROM staff WHERE name=?",(remove,))
             conn.commit()
             st.success("Staff Removed")
+
+    # --- Fuel Price Control ---
     st.subheader("Fuel Price Control")
     for f in fuel_price:
         new_price=st.number_input(f,value=float(fuel_price[f]))
@@ -258,7 +262,8 @@ elif page=="Admin Panel":
             cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
             conn.commit()
             st.success("Price Updated")
-             # --- Sales Data Edit/Delete ---
+
+    # --- Sales Data Edit/Delete ---
     st.subheader("Edit / Delete Sales Entry")
     sales_df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC",conn)
     if not sales_df.empty:
