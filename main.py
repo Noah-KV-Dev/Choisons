@@ -69,17 +69,19 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
     pw = st.sidebar.text_input("Password",type="password")
-    if st.sidebar.button("Login"):
+    login_clicked = st.sidebar.button("Login")
+    if login_clicked:
         if pw=="admin786":
             st.session_state.admin=True
-            st.experimental_rerun()
+            st.success("Admin Logged In ✅")
         else:
             st.sidebar.error("Wrong Password")
 else:
     st.sidebar.success("Admin Logged In")
-    if st.sidebar.button("Logout"):
+    logout_clicked = st.sidebar.button("Logout")
+    if logout_clicked:
         st.session_state.admin=False
-        st.experimental_rerun()
+        st.success("Logged Out ✅")
 
 # ---------------- SALES ENTRY ----------------
 if page=="Sales Entry":
