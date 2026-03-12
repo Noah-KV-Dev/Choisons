@@ -328,3 +328,16 @@ elif page=="Admin Panel":
                 st.warning("Check the box to confirm deletion")
     else:
         st.info("No staff available")
+# ---------------- RESET STAFF DAILY CHECKLIST ----------------
+st.subheader("Reset Staff Daily Checklist")
+
+# Load staff list
+staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+if staff_list:
+    reset_staff = st.selectbox("Select Staff to Reset Checklist", staff_list)
+    if st.button(f"Reset Checklist for {reset_staff}"):
+        cursor.execute("UPDATE checklist SET completed=0 WHERE date=? AND staff=?", (str(date.today()), reset_staff))
+        conn.commit()
+        st.success(f"Checklist for '{reset_staff}' has been reset ✅. Sales entry is now blocked until checklist is completed.")
+else:
+    st.info("No staff available")
