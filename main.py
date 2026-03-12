@@ -106,9 +106,7 @@ if not st.session_state.admin_logged:
             st.session_state.admin_logged = True
             st.sidebar.success("Admin Logged In")
             st.experimental_rerun()
-        else:
-            st.sidebar.error("Invalid Credentials")
-else:
+   else:
     st.sidebar.success("Admin Mode")
     if st.sidebar.button("Logout", key="logout_btn"):
         st.session_state.admin_logged = False
