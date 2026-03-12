@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 import socket
+
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -87,7 +88,78 @@ background-color:#ff6f00;
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- TITLE ----------------
+# ---------------- ADMIN SIDEBAR ----------------
+st.sidebar.title("Admin Panel")
+
+# Load data for dynamic lists
+staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
+fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
+fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
+
+if not st.session_state.admin_logged:
+    st.sidebar.subheader("Admin Login")
+    username = st.sidebar.text_input("Username", key="login_user")
+    password = st.sidebar.text_input("Password", type="password", key="login_pass")
+    if st.sidebar.button("Login", key="login_btn"):
+        if username == "admin" and password == "admin123":
+            st.session_state.admin_logged = True
+            st.sidebar.success("Admin Logged In")
+            st.experimental_rerun()
+        else:
+            st.sidebar.error("Invalid Credentials")
+else:
+    st.sidebar.success("Admin Mode")
+    if st.sidebar.button("Logout", key="logout_btn"):
+        st.session_state.admin_logged = False
+        st.experimental_rerun()
+
+    # Admin Options
+    st.sidebar.subheader("Add Staff")
+    new_staff = st.sidebar.text_input("Staff Name", key="staff_add")
+    if st.sidebar.button("Add Staff", key="add_staff_btn"):
+        if new_staff.strip():
+            try:
+                cursor.execute("INSERT INTO staff(name) VALUES (?)", (new_staff.strip(),))
+                conn.commit()
+                st.sidebar.success(f"Staff '{new_staff}' added")
+                st.experimental_rerun()
+            except sqlite3.IntegrityError:
+                st.sidebar.error("Staff already exists")
+
+    st.sidebar.subheader("Add Creditor")
+    new_creditor = st.sidebar.text_input("Creditor Name", key="creditor_add")
+    if st.sidebar.button("Add Creditor", key="add_creditor_btn"):
+        if new_creditor.strip():
+            try:
+                cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor.strip(),))
+                conn.commit()
+                st.sidebar.success(f"Creditor '{new_creditor}' added")
+                st.experimental_rerun()
+            except sqlite3.IntegrityError:
+                st.sidebar.error("Creditor already exists")
+
+    st.sidebar.subheader("Fuel Price Update")
+    for fuel in ["Petrol", "Diesel", "Power Petrol"]:
+        new_price = st.sidebar.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel, 100.0), key=f"{fuel}_price")
+        if st.sidebar.button(f"Update {fuel} Price", key=f"update_{fuel}"):
+            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?", (new_price, fuel))
+            conn.commit()
+            st.sidebar.success(f"{fuel} price updated")
+            st.experimental_rerun()
+
+    # Delete Sales Records
+    st.sidebar.subheader("Delete Sales Record")
+    df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+    if not df.empty:
+        del_id = st.sidebar.selectbox("Select Record ID", df["rowid"], key="delete_id")
+        if st.sidebar.button("Delete Record", key="delete_btn"):
+            cursor.execute("DELETE FROM sales WHERE rowid=?", (del_id,))
+            conn.commit()
+            st.sidebar.warning("Record Deleted")
+            st.experimental_rerun()
+
+# ---------------- MAIN SALES ENTRY ----------------
 st.title("⛽ Choisons Petrol Pump Management System")
 st.info("""
 Phone: +91 8590304889  
@@ -95,14 +167,6 @@ Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com
 Created by Nazeeh
 """)
 
-# ---------------- LOAD DATA ----------------
-fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
-fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
-
-staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
-
-# ---------------- SALES ENTRY ----------------
 st.subheader("Sales Entry")
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -125,7 +189,7 @@ litres = max(closing - opening, 0)
 total = litres * price
 st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
-# ---------------- PAYMENT ----------------
+# Payment Section
 st.subheader("Payment Details")
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -146,7 +210,7 @@ if credit > 0 and creditor_list:
 elif credit > 0:
     st.warning("No creditors available. Ask admin to add.")
 
-# ---------------- DUTY ----------------
+# Duty Hours
 duty_in = st.time_input("Duty IN")
 duty_out = st.time_input("Duty OUT")
 in_time = datetime.combine(date.today(), duty_in)
@@ -154,7 +218,7 @@ out_time = datetime.combine(date.today(), duty_out)
 hours = max((out_time - in_time).total_seconds() / 3600, 0)
 ip_address = socket.gethostbyname(socket.gethostname())
 
-# ---------------- SAVE ENTRY ----------------
+# Save Entry
 if st.button("Save Entry"):
     cursor.execute("""
     INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -165,7 +229,7 @@ if st.button("Save Entry"):
     st.success("Entry Saved")
     st.session_state.rerun_flag = True
 
-# ---------------- LOAD SALES ----------------
+# Load Sales for reports
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
 # ---------------- DASHBOARD ----------------
@@ -175,7 +239,6 @@ with col1: st.metric("Total Litres", df["litres"].sum())
 with col2: st.metric("Total Sales ₹", df["total"].sum())
 with col3: st.metric("Total Hours", df["hours"].sum())
 
-# ---------------- PAYMENT SUMMARY ----------------
 st.subheader("Payment Summary")
 col1, col2, col3 = st.columns(3)
 with col1: st.metric("Paytm", df["paytm"].sum())
@@ -185,19 +248,16 @@ col4, col5 = st.columns(2)
 with col4: st.metric("Credit", df["credit"].sum())
 with col5: st.metric("Advance Paid", df["advance_paid"].sum())
 
-# ---------------- STAFF SUMMARY ----------------
 st.subheader("Staff Summary")
 if not df.empty:
     staff_summary = df.groupby("staff")[["litres", "total", "hours"]].sum().reset_index()
     st.dataframe(staff_summary)
 
-# ---------------- NOZZLE SUMMARY ----------------
 st.subheader("Nozzle Sales")
 if not df.empty:
     nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
     st.dataframe(nozzle_sales)
 
-# ---------------- CREDITORS REPORT ----------------
 st.subheader("Creditors Outstanding")
 if not df.empty:
     credit_report = df.groupby("creditor_name")["credit"].sum().reset_index()
@@ -226,70 +286,6 @@ staff_data = df[(df["staff"] == selected_staff) &
 st.dataframe(staff_data)
 st.metric("Litres", staff_data["litres"].sum())
 st.metric("Sales", staff_data["total"].sum())
-
-# ---------------- ADMIN SIDEBAR ----------------
-st.sidebar.title("Admin Panel")
-
-if not st.session_state.admin_logged:
-    st.sidebar.subheader("Login")
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type="password")
-    if st.sidebar.button("Login"):
-        if username == "admin" and password == "admin123":
-            st.session_state.admin_logged = True
-            st.sidebar.success("Admin Logged In")
-            st.experimental_rerun()
-        else:
-            st.sidebar.error("Invalid Credentials")
-else:
-    st.sidebar.success("Admin Mode")
-    if st.sidebar.button("Logout"):
-        st.session_state.admin_logged = False
-        st.experimental_rerun()
-
-    # Add Staff
-    st.sidebar.subheader("Add Staff")
-    new_staff = st.sidebar.text_input("Staff Name", key="staff_add")
-    if st.sidebar.button("Add Staff", key="add_staff_btn"):
-        try:
-            cursor.execute("INSERT INTO staff(name) VALUES (?)", (new_staff,))
-            conn.commit()
-            st.sidebar.success(f"Staff '{new_staff}' added")
-            st.experimental_rerun()
-        except sqlite3.IntegrityError:
-            st.sidebar.error("Staff already exists")
-
-    # Add Creditor
-    st.sidebar.subheader("Add Creditor")
-    new_creditor = st.sidebar.text_input("Creditor Name", key="creditor_add")
-    if st.sidebar.button("Add Creditor", key="add_creditor_btn"):
-        try:
-            cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor,))
-            conn.commit()
-            st.sidebar.success(f"Creditor '{new_creditor}' added")
-            st.experimental_rerun()
-        except sqlite3.IntegrityError:
-            st.sidebar.error("Creditor already exists")
-
-    # Fuel Price Update
-    st.sidebar.subheader("Fuel Price Update")
-    for fuel in ["Petrol", "Diesel", "Power Petrol"]:
-        new_price = st.sidebar.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel, 100.0), key=f"{fuel}_price")
-        if st.sidebar.button(f"Update {fuel} Price", key=f"update_{fuel}"):
-            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?", (new_price, fuel))
-            conn.commit()
-            st.sidebar.success(f"{fuel} price updated")
-            st.experimental_rerun()
-
-    # Delete Sales Record
-    st.subheader("Delete Sales Record")
-    if not df.empty:
-        del_id = st.selectbox("Select Record ID", df["rowid"], key="delete_id")
-        if st.button("Delete Record", key="delete_btn"):
-            cursor.execute("DELETE FROM sales WHERE rowid=?", (del_id,))
-            conn.commit()
-            st.warning("Record Deleted")
-            st.experimental_rerun()
 
 # ---------------- SAFE RERUN ----------------
 if st.session_state.rerun_flag:
