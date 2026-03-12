@@ -83,6 +83,7 @@ def read_sales():
         df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
         for col in ["opening","closing","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","time_in","time_out","hours","nozzle"]:
             if col not in df.columns: df[col]=0
+        df['date'] = df['date'].astype(str)  # Ensure date column is string
         return df
     except:
         create_tables()
@@ -102,7 +103,7 @@ if page=="Sales Entry":
     staff = st.selectbox("Staff", staff_list)
 
     # Checklist check
-    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(str(sale_date),staff))
+    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(sale_date.strftime("%Y-%m-%d"),staff))
     result = cursor.fetchone()
     if not result or result[0]==0:
         st.error(f"⚠ Sales blocked for {staff}. Staff Daily Checklist not completed.")
@@ -150,7 +151,7 @@ if page=="Sales Entry":
             INSERT INTO sales(date,staff,nozzle,fuel,opening,closing,litres,price,total,
             paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,(str(sale_date),staff,nozzle_int,fuel,opening,closing,litres,price,total,
+            """,(sale_date.strftime("%Y-%m-%d"),staff,nozzle_int,fuel,opening,closing,litres,price,total,
                  paytm,sbi,hppay,advance,creditor,balance,t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours))
             conn.commit()
             st.success("Sales Entry Saved ✅ (Autosaved)")
@@ -160,7 +161,7 @@ if page=="Sales Entry":
     # Today summary
     st.markdown("---")
     df_today = read_sales()
-    today_sales = df_today[df_today["date"]==str(sale_date)]
+    today_sales = df_today[df_today["date"]==sale_date.strftime("%Y-%m-%d")]
     if not today_sales.empty:
         summary = today_sales.groupby("staff").agg(
             Opening=("opening","sum"),
@@ -191,7 +192,7 @@ elif page=="Reports":
     report_type = st.selectbox("Report Type",["Daily","Monthly"])
     if report_type=="Daily":
         d = st.date_input("Select Date",date.today())
-        r = df[df["date"]==str(d)]
+        r = df[df["date"]==d.strftime("%Y-%m-%d")]
         st.dataframe(r)
         if not r.empty:
             daily_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
@@ -225,7 +226,7 @@ elif page=="Staff Daily Checklist":
     checks=[st.checkbox(i) for i in checklist_items]
     if st.button("Apply Checklist"):
         completed = 1 if all(checks) else 0
-        cursor.execute("INSERT OR REPLACE INTO checklist(date,staff,completed) VALUES(?,?,?)",(str(date.today()),staff,completed))
+        cursor.execute("INSERT OR REPLACE INTO checklist(date,staff,completed) VALUES(?,?,?)",(date.today().strftime("%Y-%m-%d"),staff,completed))
         conn.commit()
         if completed: st.success(f"Checklist completed ✅ Sales entry enabled")
         else: st.error("Checklist incomplete ⚠ Sales entry blocked")
