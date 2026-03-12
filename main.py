@@ -76,9 +76,8 @@ else:
 def read_sales():
     """Read sales table safely"""
     try:
-        create_tables()  # ensure table exists
+        create_tables()
         df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
-        # ensure all expected columns exist
         for col in ["opening","closing","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","time_in","time_out","hours","nozzle"]:
             if col not in df.columns: df[col]=0
         if 'date' in df.columns:
@@ -155,14 +154,11 @@ if page=="Sales Entry":
         except Exception as e:
             st.error(f"Error Saving Entry: {e}")
 
-    # Today's summary
+    # --- TODAY SUMMARY ---
     st.markdown("---")
-    st.subheader("Today Staff Summary")
+    st.subheader("Today's Daily Summary")
     df = read_sales()
     today = df[df["date"]==str(date.today())]
-    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
-        if col not in today.columns: today[col]=0
-
     if not today.empty:
         summary = today.groupby("staff").agg(
             Opening=("opening","sum"),
@@ -187,25 +183,60 @@ if page=="Sales Entry":
 
 # ---------------- REPORTS ----------------
 elif page=="Reports":
-    st.title("Reports")
+    st.title("Detailed Reports")
     df = read_sales()
-    report_type = st.selectbox("Report Type",["Daily","Monthly"])
-    if report_type=="Daily":
-        d = st.date_input("Select Date",date.today())
-        r = df[df["date"]==str(d)]
-        st.dataframe(r)
-        if not r.empty:
-            daily_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(daily_summary.set_index("staff")["Litres"])
-    else:
-        df["month"]=df["date"].str.slice(0,7)
-        months=df["month"].unique()
-        m=st.selectbox("Month",months)
-        r=df[df["month"]==m]
-        st.dataframe(r)
-        if not r.empty:
-            monthly_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(monthly_summary.set_index("staff")["Litres"])
+    if df.empty:
+        st.info("No sales data available")
+        st.stop()
+    df['month'] = df['date'].str.slice(0,7)
+    report_type = st.selectbox("Report Type",["Daily Summary","Monthly Summary"])
+
+    if report_type=="Daily Summary":
+        st.subheader("Daily Summary (Date-wise)")
+        unique_dates = df['date'].dropna().unique()
+        d = st.selectbox("Select Date", unique_dates)
+        daily = df[df["date"]==d]
+        if not daily.empty:
+            summary = daily.groupby("staff").agg(
+                Opening=("opening","sum"),
+                Closing=("closing","sum"),
+                Litres=("litres","sum"),
+                Sales=("total","sum"),
+                Paytm=("paytm","sum"),
+                SBI=("sbi","sum"),
+                HPPay=("hppay","sum"),
+                Advance=("advance","sum"),
+                Creditor=("creditor","sum"),
+                CashBalance=("balance","sum"),
+                Hours=("hours","sum")
+            ).reset_index()
+            st.dataframe(summary,use_container_width=True)
+            st.bar_chart(summary.set_index("staff")["Litres"])
+        else:
+            st.info("No entries for selected date")
+
+    else:  # Monthly Summary
+        st.subheader("Monthly Summary (All Staff)")
+        months = df['month'].dropna().unique()
+        m = st.selectbox("Select Month", months)
+        monthly = df[df["month"]==m]
+        if not monthly.empty:
+            summary = monthly.groupby(["staff","month"]).agg(
+                Opening=("opening","sum"),
+                Closing=("closing","sum"),
+                Litres=("litres","sum"),
+                Sales=("total","sum"),
+                Paytm=("paytm","sum"),
+                SBI=("sbi","sum"),
+                HPPay=("hppay","sum"),
+                Advance=("advance","sum"),
+                Creditor=("creditor","sum"),
+                CashBalance=("balance","sum"),
+                Hours=("hours","sum")
+            ).reset_index()
+            st.dataframe(summary,use_container_width=True)
+        else:
+            st.info("No entries for selected month")
 
 # ---------------- STAFF DAILY CHECKLIST ----------------
 elif page=="Staff Daily Checklist":
