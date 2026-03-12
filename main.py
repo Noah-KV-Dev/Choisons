@@ -64,16 +64,16 @@ for fuel,price in default_prices.items():
 
 conn.commit()
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------- SESSION ----------------
+if "admin_logged" not in st.session_state:
+    st.session_state.admin_logged = False
+
+# ---------------- PAGE ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
 # ---------------- STYLE ----------------
 st.markdown("""
 <style>
-html,body,[class*="css"]{
-font-family:sans-serif;
-color:black;
-}
 .stApp{
 background-color:#ff6f00;
 }
@@ -85,7 +85,7 @@ st.title("⛽ Choisons Petrol Pump Management System")
 
 st.info("""
 Phone: +91 8590304889  
-Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  
+Email: kvpnaseeh@gmail.com  
 Created by Nazeeh
 """)
 
@@ -123,12 +123,11 @@ with col5:
     closing = st.number_input("Closing Meter")
 
 litres = max(closing-opening,0)
-
 total = litres*price
 
 st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
-# ---------------- PAYMENT SECTION ----------------
+# ---------------- PAYMENT ----------------
 st.subheader("Payment Details")
 
 col1,col2,col3 = st.columns(3)
@@ -152,8 +151,14 @@ st.info(f"Balance Cash: ₹ {balance_cash}")
 
 creditor_name=""
 
-if credit>0 and creditor_list:
-    creditor_name = st.selectbox("Creditor Name", creditor_list)
+if credit>0:
+
+    creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
+
+    if creditor_list:
+        creditor_name = st.selectbox("Select Creditor", creditor_list)
+    else:
+        st.warning("No creditors added. Contact admin.")
 
 # ---------------- DUTY ----------------
 duty_in = st.time_input("Duty IN")
@@ -184,7 +189,7 @@ if st.button("Save Entry"):
 df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
 # ---------------- DASHBOARD ----------------
-st.subheader("Dashboard Summary")
+st.subheader("Dashboard")
 
 col1,col2,col3 = st.columns(3)
 
@@ -219,21 +224,21 @@ with col4:
 with col5:
     st.metric("Advance Paid", df["advance_paid"].sum())
 
-# ---------------- STAFF SUMMARY ----------------
+# ---------------- STAFF REPORT ----------------
 st.subheader("Staff Summary")
 
 staff_summary = df.groupby("staff")[["litres","total","hours"]].sum().reset_index()
 
 st.dataframe(staff_summary)
 
-# ---------------- NOZZLE SUMMARY ----------------
+# ---------------- NOZZLE REPORT ----------------
 st.subheader("Nozzle Sales")
 
 nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 
 st.dataframe(nozzle_sales)
 
-# ---------------- CREDITORS REPORT ----------------
+# ---------------- CREDITOR REPORT ----------------
 st.subheader("Creditors Outstanding")
 
 credit_report = df.groupby("creditor_name")["credit"].sum().reset_index()
@@ -253,12 +258,6 @@ st.metric("Litres Sold", search_data["litres"].sum())
 
 st.metric("Total Sales", search_data["total"].sum())
 
-st.metric("Paytm", search_data["paytm"].sum())
-
-st.metric("HP Pay", search_data["hp_pay"].sum())
-
-st.metric("Cash", search_data["cash"].sum())
-
 # ---------------- STAFF SEARCH ----------------
 st.subheader("Search Staff Sales")
 
@@ -274,43 +273,61 @@ staff_data = df[(df["staff"]==selected_staff) &
 
 st.dataframe(staff_data)
 
-st.metric("Litres", staff_data["litres"].sum())
-
-st.metric("Sales", staff_data["total"].sum())
-
-# ---------------- ADMIN PANEL ----------------
+# ---------------- ADMIN LOGIN ----------------
 st.sidebar.title("Admin Panel")
 
-new_staff = st.sidebar.text_input("Add Staff")
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
 
-if st.sidebar.button("Add Staff"):
-    try:
-        cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
-        conn.commit()
-        st.sidebar.success("Staff Added")
-    except:
-        st.sidebar.error("Staff Exists")
+if st.sidebar.button("Login"):
+    if username=="admin" and password=="admin123":
+        st.session_state.admin_logged=True
+        st.sidebar.success("Admin Logged In")
+    else:
+        st.sidebar.error("Invalid Login")
 
-new_creditor = st.sidebar.text_input("Add Creditor")
+if st.session_state.admin_logged:
 
-if st.sidebar.button("Add Creditor"):
-    try:
-        cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
-        conn.commit()
-        st.sidebar.success("Creditor Added")
-    except:
-        st.sidebar.error("Creditor Exists")
+    if st.sidebar.button("Logout"):
+        st.session_state.admin_logged=False
 
-st.sidebar.subheader("Fuel Price Update")
+    # ---------------- STAFF ADD ----------------
+    st.sidebar.subheader("Add Staff")
 
-for fuel in ["Petrol","Diesel","Power Petrol"]:
+    new_staff = st.sidebar.text_input("Staff Name")
 
-    new_price = st.sidebar.number_input(f"{fuel} Price",value=fuel_price_dict.get(fuel,100.0))
+    if st.sidebar.button("Add Staff"):
+        try:
+            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+            conn.commit()
+            st.sidebar.success("Staff Added")
+        except:
+            st.sidebar.error("Staff Exists")
 
-    if st.sidebar.button(f"Update {fuel}"):
+    # ---------------- ADD CREDITORS ----------------
+    st.sidebar.subheader("Add Creditor")
 
-        cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+    new_creditor = st.sidebar.text_input("Creditor Name")
 
-        conn.commit()
+    if st.sidebar.button("Add Creditor"):
+        try:
+            cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
+            conn.commit()
+            st.sidebar.success("Creditor Added")
+        except:
+            st.sidebar.error("Creditor Exists")
 
-        st.sidebar.success(f"{fuel} price updated")
+    # ---------------- FUEL PRICE ----------------
+    st.sidebar.subheader("Fuel Price Update")
+
+    for fuel in ["Petrol","Diesel","Power Petrol"]:
+
+        new_price = st.sidebar.number_input(f"{fuel} Price",value=fuel_price_dict.get(fuel,100.0))
+
+        if st.sidebar.button(f"Update {fuel}"):
+
+            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+
+            conn.commit()
+
+            st.sidebar.success(f"{fuel} price updated")
