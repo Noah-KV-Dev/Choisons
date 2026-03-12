@@ -60,15 +60,19 @@ for fuel,price in default_prices.items():
 
 conn.commit()
 
+# ---------------- CHECKLIST SESSION ----------------
+if "checklist_done" not in st.session_state:
+    st.session_state.checklist_done = False
+
+if "missing_items" not in st.session_state:
+    st.session_state.missing_items = []
+
 # ---------------- FUNCTIONS ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
     if not df.empty:
         df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
     return df
-
-def export_excel(data):
-    return data.to_csv(index=False).encode("utf-8")
 
 df = load_data()
 
@@ -86,7 +90,6 @@ if "admin" not in st.session_state:
 
 st.sidebar.subheader("Admin Login")
 
-admin_user = st.sidebar.text_input("Username")
 admin_pass = st.sidebar.text_input("Password", type="password")
 
 if st.sidebar.button("Login"):
@@ -96,11 +99,9 @@ if st.sidebar.button("Login"):
     else:
         st.sidebar.error("Wrong Password")
 
-# ADMIN LOGOUT
 if st.session_state.admin:
     if st.sidebar.button("Logout Admin"):
         st.session_state.admin = False
-        st.sidebar.success("Admin Logged Out")
         st.rerun()
 
 # ---------------- MENU ----------------
@@ -111,8 +112,79 @@ if st.session_state.admin:
 
 page = st.sidebar.selectbox("Menu", menu)
 
+# ---------------- CHECKLIST PAGE ----------------
+if page == "HP Daily Staff Check List":
+
+    st.header("HP Daily Staff Check List")
+
+    c1 = st.checkbox("Staff on time")
+    c2 = st.checkbox("Proper uniform & ID card")
+    c3 = st.checkbox("No mobile phone during duty")
+
+    c4 = st.checkbox("Opening meter reading checked")
+    c5 = st.checkbox("No leakage in nozzle")
+    c6 = st.checkbox("Correct fuel delivery")
+
+    c7 = st.checkbox("Opening cash verified")
+    c8 = st.checkbox("Cash matches system sales")
+    c9 = st.checkbox("UPI / Card machine working")
+
+    c10 = st.checkbox("Fire extinguisher available")
+    c11 = st.checkbox("No smoking in forecourt")
+    c12 = st.checkbox("Emergency switch working")
+
+    c13 = st.checkbox("Closing nozzle reading recorded")
+    c14 = st.checkbox("Cash balance checked")
+    c15 = st.checkbox("Daily report completed")
+
+    if st.button("Apply Checklist"):
+
+        missing = []
+
+        checks = [
+            (c1,"Staff not confirmed on time"),
+            (c2,"Uniform not confirmed"),
+            (c3,"Mobile rule not confirmed"),
+            (c4,"Opening meter not checked"),
+            (c5,"Nozzle leakage not confirmed"),
+            (c6,"Fuel delivery not confirmed"),
+            (c7,"Opening cash not verified"),
+            (c8,"Cash matching not verified"),
+            (c9,"UPI/Card machine not checked"),
+            (c10,"Fire extinguisher not checked"),
+            (c11,"No smoking rule not confirmed"),
+            (c12,"Emergency switch not checked"),
+            (c13,"Closing meter not confirmed"),
+            (c14,"Cash balance not confirmed"),
+            (c15,"Daily report not confirmed")
+        ]
+
+        for status,msg in checks:
+            if not status:
+                missing.append(msg)
+
+        if len(missing)==0:
+            st.session_state.checklist_done=True
+            st.session_state.missing_items=[]
+            st.success("Checklist Completed. Sales Entry Enabled.")
+        else:
+            st.session_state.checklist_done=False
+            st.session_state.missing_items=missing
+            st.error("Checklist incomplete")
+
 # ---------------- SALES ENTRY ----------------
-if page == "Sales Entry":
+elif page == "Sales Entry":
+
+    if not st.session_state.checklist_done:
+
+        st.warning("Sales Entry Blocked")
+
+        if st.session_state.missing_items:
+            st.write("### Reason:")
+            for m in st.session_state.missing_items:
+                st.write("❌",m)
+
+        st.stop()
 
     st.subheader("Fuel Entry")
 
@@ -143,8 +215,6 @@ if page == "Sales Entry":
     total = litres*price
 
     st.success(f"Litres: {litres} | Amount ₹ {total}")
-
-    st.subheader("Payments")
 
     col1,col2,col3,col4,col5 = st.columns(5)
 
@@ -193,78 +263,16 @@ elif page == "Reports":
     with col2: st.metric("Total Sales ₹", df["total"].sum())
     with col3: st.metric("Total Hours", df["hours"].sum())
 
-    st.subheader("Daily Sales Report")
-
-    report_date = st.date_input("Select Date", date.today())
-
-    daily_df = df[df["date"] == str(report_date)]
-
-    if not daily_df.empty:
-
-        daily_df = daily_df.sort_values("staff")
-
-        st.dataframe(daily_df)
-
-        st.write("### Totals")
-
-        st.write("Total Litres:", daily_df["litres"].sum())
-        st.write("Total Sales:", daily_df["total"].sum())
-        st.write("Total Cash:", daily_df["cash"].sum())
-
-        csv = export_excel(daily_df)
-
-        st.download_button(
-            "Download Daily Report",
-            csv,
-            "daily_sales.csv",
-            "text/csv"
-        )
-
-    else:
-        st.info("No sales found")
-
     st.subheader("Fuel Chart")
     st.bar_chart(df.groupby("fuel")["litres"].sum())
 
     st.subheader("Staff Performance")
     st.bar_chart(df.groupby("staff")["total"].sum())
 
-# ---------------- HP DAILY STAFF CHECKLIST ----------------
-elif page == "HP Daily Staff Check List":
-
-    st.header("HP Daily Staff Check List")
-
-    st.subheader("1️⃣ Staff Discipline")
-    st.checkbox("Staff on time")
-    st.checkbox("Proper uniform & ID card")
-    st.checkbox("No mobile phone during duty")
-
-    st.subheader("2️⃣ Nozzle & Fuel")
-    st.checkbox("Opening meter reading checked")
-    st.checkbox("No leakage in nozzle")
-    st.checkbox("Correct fuel delivery")
-
-    st.subheader("3️⃣ Cash Control")
-    st.checkbox("Opening cash verified")
-    st.checkbox("Cash matches system sales")
-    st.checkbox("UPI / Card machine working")
-
-    st.subheader("4️⃣ Safety")
-    st.checkbox("Fire extinguisher available")
-    st.checkbox("No smoking in forecourt")
-    st.checkbox("Emergency switch working")
-
-    st.subheader("5️⃣ Closing Check")
-    st.checkbox("Closing nozzle reading recorded")
-    st.checkbox("Cash balance checked")
-    st.checkbox("Daily report completed")
-
-# ---------------- ADMIN CONTROLS ----------------
+# ---------------- ADMIN ----------------
 elif page == "Admin Controls":
 
     st.subheader("Admin Controls")
-
-    st.write("### Add Staff")
 
     new_staff = st.text_input("Staff Name")
 
@@ -278,8 +286,6 @@ elif page == "Admin Controls":
 
     st.divider()
 
-    st.write("### Remove Staff")
-
     staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 
     remove_staff = st.selectbox("Select Staff", staff_list)
@@ -287,27 +293,5 @@ elif page == "Admin Controls":
     if st.button("Remove Staff"):
         cursor.execute("DELETE FROM staff WHERE name=?", (remove_staff,))
         conn.commit()
-        st.success(f"{remove_staff} removed")
+        st.success("Staff removed")
         st.rerun()
-
-    st.divider()
-
-    st.write("### Update Fuel Prices")
-
-    for fuel in ["Petrol","Diesel","Power Petrol"]:
-
-        new_price = st.number_input(
-            fuel,
-            value=float(fuel_price_dict.get(fuel,100))
-        )
-
-        if st.button(f"Update {fuel}"):
-
-            cursor.execute(
-                "UPDATE fuel_prices SET price=? WHERE fuel=?",
-                (new_price,fuel)
-            )
-
-            conn.commit()
-
-            st.success(f"{fuel} price updated")
