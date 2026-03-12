@@ -80,7 +80,6 @@ def load_data():
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
 fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
 staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
 df = load_data()
 
 # ---------------- SESSION STATE ----------------
@@ -166,6 +165,43 @@ if menu_option == "Sales Entry":
         st.success("Entry Saved Successfully!")
         try: st.experimental_rerun()
         except: pass
+
+    # ---------------- DAILY REPORT ----------------
+    st.subheader("Daily Sales Report")
+    daily_data = df[df["date"]==str(entry_date)]
+    if not daily_data.empty:
+        st.markdown("<small>", unsafe_allow_html=True)
+        st.dataframe(daily_data[[
+            "date","staff","fuel","nozzle","litres","total","paytm","hp_pay","cash",
+            "advance_paid","credit_sale","balance_cash","duty_in","duty_out","hours"
+        ]])
+        st.markdown("</small>", unsafe_allow_html=True)
+        st.metric("Daily Litres", daily_data["litres"].sum())
+        st.metric("Daily Total Sales", daily_data["total"].sum())
+        st.metric("Daily Credit Sale", daily_data["credit_sale"].sum())
+    else:
+        st.info("No sales for selected day.")
+
+    # ---------------- MONTHLY STAFF REPORT ----------------
+    st.subheader("Monthly Staff Report")
+    month_selected = entry_date.strftime("%Y-%m")
+    monthly_data = df[df["date"].str.startswith(month_selected)]
+    if not monthly_data.empty:
+        monthly_staff_report = monthly_data.sort_values(["staff","date"]).reset_index(drop=True)
+        st.markdown("<small>", unsafe_allow_html=True)
+        st.dataframe(monthly_staff_report[[
+            "date","staff","fuel","nozzle","opening","closing","litres","price","total",
+            "paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","duty_in",
+            "duty_out","hours"
+        ]])
+        st.markdown("</small>", unsafe_allow_html=True)
+        staff_summary = monthly_staff_report.groupby("staff")[[
+            "litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"
+        ]].sum().reset_index()
+        st.subheader("Monthly Summary Per Staff")
+        st.dataframe(staff_summary)
+    else:
+        st.info("No sales for the selected month.")
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
