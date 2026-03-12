@@ -9,7 +9,6 @@ st.set_page_config(page_title="Petrol Pump Manager", layout="wide")
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# SALES TABLE
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,13 +33,8 @@ hours REAL
 )
 """)
 
-# STAFF TABLE
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
-
-# FUEL PRICE TABLE
 cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
-
-# CHECKLIST TABLE
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS checklist(
 date TEXT,
@@ -49,7 +43,6 @@ completed INTEGER,
 PRIMARY KEY(date,staff)
 )
 """)
-
 conn.commit()
 
 # ---------------- DEFAULT FUELS ----------------
@@ -61,14 +54,17 @@ fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
 fuel_price = dict(zip(fuel_df["fuel"],fuel_df["price"]))
 
 # ---------------- SESSION ----------------
-if "admin" not in st.session_state: st.session_state.admin=False
-if "check_date" not in st.session_state: st.session_state.check_date=str(date.today())
+if "admin" not in st.session_state:
+    st.session_state.admin=False
+if "check_date" not in st.session_state:
+    st.session_state.check_date=str(date.today())
 if st.session_state.check_date != str(date.today()):
     st.session_state.check_date=str(date.today())
 
 # ---------------- SIDEBAR ----------------
 menu=["Sales Entry","Reports","Staff Daily Checklist"]
-if st.session_state.admin: menu.append("Admin Panel")
+if st.session_state.admin:
+    menu.append("Admin Panel")
 page = st.sidebar.selectbox("Menu",menu)
 
 # ---------------- ADMIN LOGIN ----------------
@@ -106,27 +102,26 @@ if page=="Sales Entry":
 
     # --- DUTY TIMES ---
     col1,col2 = st.columns(2)
-    with col1: time_in = st.time_input("Duty IN")
-    with col2: time_out = st.time_input("Duty OUT")
+    with col1:
+        time_in = st.time_input("Duty IN")
+    with col2:
+        time_out = st.time_input("Duty OUT")
     t1 = datetime.combine(date.today(),time_in)
     t2 = datetime.combine(date.today(),time_out)
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-  # --- NOZZLE / OPENING ---
-nozzle = st.selectbox("Nozzle", list(range(1,13)))
-
-try:
-    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1", (nozzle,))
-    last = cursor.fetchone()
-    opening_default = float(last[0]) if last and last[0] is not None else 0.0
-except Exception as e:
-    opening_default = 0.0  # fallback if table empty or column missing
-
-opening = st.number_input("Opening Meter", value=opening_default)
-closing = st.number_input("Closing Meter", 0.0)
-litres = max(closing - opening, 0)
-
+    # --- NOZZLE / OPENING ---
+    nozzle = st.selectbox("Nozzle", list(range(1,13)))
+    try:
+        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1", (nozzle,))
+        last = cursor.fetchone()
+        opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    except:
+        opening_default = 0.0
+    opening = st.number_input("Opening Meter", value=opening_default)
+    closing = st.number_input("Closing Meter", 0.0)
+    litres = max(closing - opening, 0)
 
     # --- FUEL ---
     fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
@@ -161,30 +156,6 @@ litres = max(closing - opening, 0)
         conn.commit()
         st.success("Entry Saved")
 
-    # --- TODAY SUMMARY ---
-    st.markdown("---")
-    st.subheader("Today Staff Summary")
-    df = pd.read_sql("SELECT * FROM sales",conn)
-    today = df[df["date"]==str(date.today())]
-    if len(today)>0:
-        summary = today.groupby("staff").agg(
-            Opening=("opening","sum"),
-            Closing=("closing","sum"),
-            Litres=("litres","sum"),
-            Sales=("total","sum"),
-            Paytm=("paytm","sum"),
-            SBI=("sbi","sum"),
-            HPPay=("hppay","sum"),
-            Advance=("advance","sum"),
-            Creditor=("creditor","sum"),
-            CashBalance=("balance","sum"),
-            Hours=("hours","sum")
-        ).reset_index()
-        summary["Cash Short"] = summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
-        summary["Cash Excess"] = summary["CashBalance"].apply(lambda x: x if x>0 else 0)
-        st.dataframe(summary,use_container_width=True)
-        st.bar_chart(summary.set_index("staff")["Litres"])
-
 # ---------------- REPORTS ----------------
 elif page=="Reports":
     st.title("Reports")
@@ -199,25 +170,7 @@ elif page=="Reports":
         months = df["month"].unique()
         m = st.selectbox("Month",months)
         r = df[df["month"]==m]
-        summary = r.groupby("staff").agg(
-            Opening=("opening","sum"),
-            Closing=("closing","sum"),
-            Litres=("litres","sum"),
-            Sales=("total","sum"),
-            Paytm=("paytm","sum"),
-            SBI=("sbi","sum"),
-            HPPay=("hppay","sum"),
-            Advance=("advance","sum"),
-            Creditor=("creditor","sum"),
-            CashBalance=("balance","sum"),
-            Hours=("hours","sum")
-        ).reset_index()
-        summary["Cash Short"] = summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
-        summary["Cash Excess"] = summary["CashBalance"].apply(lambda x: x if x>0 else 0)
-        st.subheader("Monthly Staff Summary")
-        st.dataframe(summary,use_container_width=True)
-        st.subheader("Monthly Staff Litre Graph")
-        st.bar_chart(summary.set_index("staff")["Litres"])
+        st.dataframe(r)
 
 # ---------------- STAFF DAILY CHECKLIST ----------------
 elif page=="Staff Daily Checklist":
@@ -284,21 +237,3 @@ elif page=="Admin Panel":
             cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
             conn.commit()
             st.success("Price Updated")
-    # --- EDIT SALES ---
-    st.subheader("Edit Sales Data")
-    df = pd.read_sql("SELECT * FROM sales",conn)
-    if len(df)>0:
-        edit_id = st.selectbox("Select Record ID",df["id"])
-        row = df[df["id"]==edit_id].iloc[0]
-        new_open = st.number_input("Opening",value=float(row["opening"]))
-        new_close = st.number_input("Closing",value=float(row["closing"]))
-        if st.button("Update Record"):
-            litres = new_close - new_open
-            total = litres * row["price"]
-            cursor.execute("""
-            UPDATE sales
-            SET opening=?,closing=?,litres=?,total=?
-            WHERE id=?
-            """,(new_open,new_close,litres,total,edit_id))
-            conn.commit()
-            st.success("Record Updated")
