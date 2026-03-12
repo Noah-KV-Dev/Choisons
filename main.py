@@ -57,28 +57,32 @@ price REAL
 conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
-default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
+default_prices={"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
 
-for fuel, price in default_prices.items():
+for fuel,price in default_prices.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_prices VALUES (?,?)",(fuel,price))
 
 conn.commit()
 
-# ---------------- SESSION STATE ----------------
+# ---------------- SESSION ----------------
 if "admin_logged" not in st.session_state:
     st.session_state.admin_logged=False
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="Choisons Petrol Pump",layout="wide")
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
 # ---------------- STYLE ----------------
 st.markdown("""
 <style>
+html,body,[class*="css"]{
+font-family:sans-serif;
+color:black;
+}
 .stApp{
 background-color:#ff6f00;
 }
 </style>
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ---------------- TITLE ----------------
 st.title("⛽ Choisons Petrol Pump Management System")
@@ -90,84 +94,84 @@ Created by Nazeeh
 """)
 
 # ---------------- LOAD DATA ----------------
-fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices",conn)
-fuel_price_dict = dict(zip(fuel_prices_df['fuel'],fuel_prices_df['price']))
+fuel_prices_df=pd.read_sql("SELECT * FROM fuel_prices",conn)
+fuel_price_dict=dict(zip(fuel_prices_df['fuel'],fuel_prices_df['price']))
 
-staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
-creditor_list = pd.read_sql("SELECT name FROM creditors",conn)["name"].tolist()
+staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
+creditor_list=pd.read_sql("SELECT name FROM creditors",conn)["name"].tolist()
 
 # ---------------- SALES ENTRY ----------------
 st.subheader("Sales Entry")
 
-col1,col2,col3 = st.columns(3)
+col1,col2,col3=st.columns(3)
 
 with col1:
-    staff = st.selectbox("Staff Name",staff_list if staff_list else ["No Staff"])
+    staff=st.selectbox("Staff Name",staff_list if staff_list else ["No Staff"])
 
 with col2:
-    entry_date = st.date_input("Date",date.today())
+    entry_date=st.date_input("Date",date.today())
 
 with col3:
-    fuel = st.selectbox("Fuel Type",["Petrol","Diesel","Power Petrol"])
+    fuel=st.selectbox("Fuel Type",["Petrol","Diesel","Power Petrol"])
 
-price = fuel_price_dict.get(fuel,100)
+price=fuel_price_dict.get(fuel,100)
 
-nozzle = st.selectbox("Nozzle",[f"Nozzle {i}" for i in range(1,11)])
+nozzle=st.selectbox("Nozzle",[f"Nozzle {i}" for i in range(1,11)])
 
-col4,col5 = st.columns(2)
+col4,col5=st.columns(2)
 
 with col4:
-    opening = st.number_input("Opening Meter")
+    opening=st.number_input("Opening Meter")
 
 with col5:
-    closing = st.number_input("Closing Meter")
+    closing=st.number_input("Closing Meter")
 
-litres = max(closing-opening,0)
-total = litres*price
+litres=max(closing-opening,0)
+total=litres*price
 
-st.success(f"Litres Sold: {litres} L | Total ₹ {total}")
+st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
 # ---------------- PAYMENT ----------------
 st.subheader("Payment Details")
 
-col1,col2,col3 = st.columns(3)
+col1,col2,col3=st.columns(3)
 
 with col1:
-    paytm = st.number_input("Paytm",0.0)
+    paytm=st.number_input("Paytm",0.0)
 
 with col2:
-    hp_pay = st.number_input("HP Pay",0.0)
+    hp_pay=st.number_input("HP Pay",0.0)
 
 with col3:
-    cash = st.number_input("Cash",0.0)
+    cash=st.number_input("Cash",0.0)
 
-credit = st.number_input("Credit",0.0)
-advance_paid = st.number_input("Advance Paid",0.0)
+credit=st.number_input("Credit",0.0)
+advance_paid=st.number_input("Advance Paid",0.0)
 
-balance_cash = total-(paytm+hp_pay+cash+advance_paid)
+balance_cash=total-(paytm+hp_pay+cash+advance_paid)
 
-st.info(f"Balance Cash ₹ {balance_cash}")
+st.info(f"Balance Cash: ₹ {balance_cash}")
 
 creditor_name=""
 
 if credit>0:
     if creditor_list:
-        creditor_name = st.selectbox("Select Creditor",creditor_list)
+        creditor_name=st.selectbox("Creditor Name",creditor_list)
     else:
-        st.warning("No creditors added yet")
+        st.warning("No creditors available. Ask admin to add.")
 
 # ---------------- DUTY ----------------
-duty_in = st.time_input("Duty IN")
-duty_out = st.time_input("Duty OUT")
+duty_in=st.time_input("Duty IN")
+duty_out=st.time_input("Duty OUT")
 
-in_time = datetime.combine(date.today(),duty_in)
-out_time = datetime.combine(date.today(),duty_out)
+in_time=datetime.combine(date.today(),duty_in)
+out_time=datetime.combine(date.today(),duty_out)
 
-hours = max((out_time-in_time).total_seconds()/3600,0)
+hours=max((out_time-in_time).total_seconds()/3600,0)
 
-ip_address = socket.gethostbyname(socket.gethostname())
+ip_address=socket.gethostbyname(socket.gethostname())
 
-# ---------------- SAVE ----------------
+# ---------------- SAVE ENTRY ----------------
 if st.button("Save Entry"):
 
     cursor.execute("""
@@ -181,12 +185,12 @@ if st.button("Save Entry"):
     st.success("Entry Saved")
 
 # ---------------- LOAD SALES ----------------
-df = pd.read_sql("SELECT rowid,* FROM sales",conn)
+df=pd.read_sql("SELECT rowid,* FROM sales",conn)
 
 # ---------------- DASHBOARD ----------------
 st.subheader("Dashboard Summary")
 
-col1,col2,col3 = st.columns(3)
+col1,col2,col3=st.columns(3)
 
 with col1:
     st.metric("Total Litres",df["litres"].sum())
@@ -200,7 +204,7 @@ with col3:
 # ---------------- PAYMENT SUMMARY ----------------
 st.subheader("Payment Summary")
 
-col1,col2,col3 = st.columns(3)
+col1,col2,col3=st.columns(3)
 
 with col1:
     st.metric("Paytm",df["paytm"].sum())
@@ -211,29 +215,65 @@ with col2:
 with col3:
     st.metric("Cash",df["cash"].sum())
 
-# ---------------- CREDIT REPORT ----------------
+# ---------------- STAFF SUMMARY ----------------
+st.subheader("Staff Summary")
+
+if not df.empty:
+    staff_summary=df.groupby("staff")[["litres","total","hours"]].sum().reset_index()
+    st.dataframe(staff_summary)
+
+# ---------------- NOZZLE SUMMARY ----------------
+st.subheader("Nozzle Sales")
+
+if not df.empty:
+    nozzle_sales=df.groupby("nozzle")["litres"].sum().reset_index()
+    st.dataframe(nozzle_sales)
+
+# ---------------- CREDITORS REPORT ----------------
 st.subheader("Creditors Outstanding")
 
-credit_report = df.groupby("creditor_name")["credit"].sum().reset_index()
+if not df.empty:
+    credit_report=df.groupby("creditor_name")["credit"].sum().reset_index()
+    st.dataframe(credit_report)
 
-st.dataframe(credit_report)
-
-# ---------------- DAILY REPORT ----------------
+# ---------------- DAILY SEARCH ----------------
 st.subheader("Search Daily Sales")
 
-search_date = st.date_input("Select Date",date.today())
+search_date=st.date_input("Select Date",date.today(),key="daily")
 
-search_data = df[df["date"]==str(search_date)]
+search_data=df[df["date"]==str(search_date)]
 
 st.dataframe(search_data)
 
-# ---------------- ADMIN SIDEBAR ----------------
+st.metric("Litres Sold",search_data["litres"].sum())
+st.metric("Total Sales",search_data["total"].sum())
+
+# ---------------- STAFF SEARCH ----------------
+st.subheader("Search Staff Sales")
+
+selected_staff=st.selectbox("Select Staff",staff_list if staff_list else ["None"])
+
+col1,col2=st.columns(2)
+
+with col1:
+    from_date=st.date_input("From Date",date.today())
+
+with col2:
+    to_date=st.date_input("To Date",date.today())
+
+staff_data=df[(df["staff"]==selected_staff)&
+(df["date"]>=str(from_date))&
+(df["date"]<=str(to_date))]
+
+st.dataframe(staff_data)
+
+# ---------------- ADMIN PANEL ----------------
 st.sidebar.title("Admin Panel")
 
 if not st.session_state.admin_logged:
 
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password",type="password")
+    username=st.sidebar.text_input("Username")
+    password=st.sidebar.text_input("Password",type="password")
 
     if st.sidebar.button("Login"):
 
@@ -243,7 +283,7 @@ if not st.session_state.admin_logged:
         else:
             st.sidebar.error("Invalid Login")
 
-# ---------------- ADMIN CONTROLS ----------------
+# ---------------- ADMIN OPTIONS ----------------
 if st.session_state.admin_logged:
 
     st.sidebar.success("Admin Mode")
@@ -253,7 +293,7 @@ if st.session_state.admin_logged:
 
     st.sidebar.subheader("Add Staff")
 
-    new_staff = st.sidebar.text_input("Staff Name")
+    new_staff=st.sidebar.text_input("Staff Name")
 
     if st.sidebar.button("Add Staff"):
         try:
@@ -261,11 +301,11 @@ if st.session_state.admin_logged:
             conn.commit()
             st.sidebar.success("Staff Added")
         except:
-            st.sidebar.error("Staff already exists")
+            st.sidebar.error("Staff Exists")
 
     st.sidebar.subheader("Add Creditor")
 
-    new_creditor = st.sidebar.text_input("Creditor Name")
+    new_creditor=st.sidebar.text_input("Creditor Name")
 
     if st.sidebar.button("Add Creditor"):
         try:
@@ -273,31 +313,28 @@ if st.session_state.admin_logged:
             conn.commit()
             st.sidebar.success("Creditor Added")
         except:
-            st.sidebar.error("Creditor exists")
+            st.sidebar.error("Creditor Exists")
 
     st.sidebar.subheader("Fuel Price Update")
 
     for fuel in ["Petrol","Diesel","Power Petrol"]:
 
-        new_price = st.sidebar.number_input(f"{fuel} Price",value=fuel_price_dict.get(fuel,100.0))
+        new_price=st.sidebar.number_input(f"{fuel} Price",value=fuel_price_dict.get(fuel,100.0))
 
         if st.sidebar.button(f"Update {fuel}"):
 
             cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
-
             conn.commit()
 
             st.sidebar.success(f"{fuel} price updated")
 
-    st.subheader("Delete Sales Records")
+    st.subheader("Delete Sales Record")
 
     if not df.empty:
 
-        del_id = st.selectbox("Select Record ID",df["rowid"])
+        del_id=st.selectbox("Select Record ID",df["rowid"])
 
         if st.button("Delete Record"):
-
             cursor.execute("DELETE FROM sales WHERE rowid=?",(del_id,))
             conn.commit()
-
             st.warning("Record Deleted")
