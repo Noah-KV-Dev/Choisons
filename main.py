@@ -22,15 +22,15 @@ total REAL,
 paytm REAL,
 hp_pay REAL,
 cash REAL,
-credit REAL,
 advance_paid REAL,
 balance_cash REAL,
-creditor_name TEXT,
 duty_in TEXT,
 duty_out TEXT,
 hours REAL,
 ip_address TEXT,
-vehicle_number TEXT
+creditor_name TEXT,
+vehicle_number TEXT,
+credit_amount REAL
 )
 """)
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
@@ -74,10 +74,10 @@ st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@
 # ---------------- LOAD DATA ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-    for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number","creditor_name"]:
+    for col in ["paytm","hp_pay","cash","advance_paid","balance_cash","vehicle_number","creditor_name","credit_amount"]:
         if col not in df.columns:
             df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
-    df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+    df.fillna({"paytm":0,"hp_pay":0,"cash":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":"","credit_amount":0}, inplace=True)
     df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
     return df
 
@@ -148,45 +148,38 @@ if menu_option == "Sales Entry":
     with col1: paytm = st.number_input("Paytm", 0.0)
     with col2: hp_pay = st.number_input("HP Pay", 0.0)
     with col3: cash = st.number_input("Cash", 0.0)
-    credit = st.number_input("Credit", 0.0)
     advance_paid = st.number_input("Advance Paid", 0.0)
-    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit), 0)
-    st.info(f"Balance Cash: ₹ {balance_cash}")
+    # total credit input
+    credit = st.number_input("Total Credit Amount", min_value=0.0)
 
     # ---------------- DYNAMIC CREDITORS ----------------
-    st.subheader("Creditors for this Sale")
-    col1, col2 = st.columns([4,1])
-    with col1:
-        selected_creditor = st.selectbox("Select Existing Creditor", ["--None--"] + creditor_list, key="creditor_dropdown")
-    with col2:
-        add_new = st.button("➕", key="add_creditor_btn")  # plus button
+    st.subheader("Creditors for this Sale (Amount Auto)")
+    if "sale_creditors" not in st.session_state:
+        st.session_state.sale_creditors = []
 
-    # Add new creditor dynamically
-    if add_new:
-        new_creditor_name = st.text_input("Enter New Creditor Name", key="new_creditor_input")
-        new_vehicle = st.text_input("Vehicle Number", key="new_vehicle_input")
-        if new_creditor_name.strip() != "":
-            cursor.execute("SELECT COUNT(*) FROM creditors WHERE name=?", (new_creditor_name.strip(),))
-            if cursor.fetchone()[0] == 0:
-                cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor_name.strip(),))
-                conn.commit()
-                creditor_list.append(new_creditor_name.strip())
-                st.success(f"New creditor '{new_creditor_name.strip()}' added.")
+    selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
+    vehicle_number = st.text_input("Vehicle Number (Optional)")
+
+    if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
+        # auto assign amount
+        existing_sum = sum([c["amount"] for c in st.session_state.sale_creditors])
+        remaining = max(credit - existing_sum, 0)
+        if remaining > 0:
             st.session_state.sale_creditors.append({
-                "creditor_name": new_creditor_name.strip(),
-                "vehicle_number": new_vehicle.strip()
+                "creditor_name": selected_creditor,
+                "vehicle_number": vehicle_number.strip(),
+                "amount": remaining
             })
 
-    # Add selected existing creditor to list
-    if selected_creditor != "--None--" and st.button("Add Selected Creditor", key="add_existing_creditor_btn"):
-        st.session_state.sale_creditors.append({
-            "creditor_name": selected_creditor,
-            "vehicle_number": ""
-        })
-
-    # Show current creditors table
     if st.session_state.sale_creditors:
         st.table(pd.DataFrame(st.session_state.sale_creditors))
+        auto_total_credit = sum([c["amount"] for c in st.session_state.sale_creditors])
+        st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
+        balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
+        st.info(f"Updated Balance Cash: ₹ {balance_cash}")
+    else:
+        balance_cash = max(total - (paytm + hp_pay + cash + advance_paid), 0)
+        st.info(f"Balance Cash: ₹ {balance_cash}")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -195,24 +188,25 @@ if menu_option == "Sales Entry":
     hours = max((out_time-in_time).total_seconds()/3600,0)
     ip_address = socket.gethostbyname(socket.gethostname())
 
-    # Save entry
     if st.button("Save Entry", key="save_sales_btn"):
         if not st.session_state.sale_creditors:
-            cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+            # no creditors
+            cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
                 str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-                paytm, hp_pay, cash, credit, advance_paid, balance_cash, "",
-                str(duty_in), str(duty_out), hours, ip_address, ""
+                paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
+                ip_address, "", "", 0
             ))
         else:
             for creditor in st.session_state.sale_creditors:
-                cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
                     str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-                    paytm, hp_pay, cash, credit, advance_paid, balance_cash, creditor.get("creditor_name",""),
-                    str(duty_in), str(duty_out), hours, ip_address, creditor.get("vehicle_number","")
+                    paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
+                    ip_address, creditor.get("creditor_name",""), creditor.get("vehicle_number",""),
+                    creditor.get("amount",0)
                 ))
         conn.commit()
         df = load_data()
-        st.session_state.sale_creditors = []  # Reset after saving
+        st.session_state.sale_creditors = []
         st.success("Entry Saved Successfully!")
         try: st.experimental_rerun()
         except: pass
@@ -226,10 +220,10 @@ elif menu_option == "Reports & Summary":
     with col3: st.metric("Total Hours", df["hours"].sum())
 
     st.subheader("Payment Summary")
-    st.dataframe(df[["paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().to_frame().T)
+    st.dataframe(df[["paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount"]].sum().to_frame().T)
 
     st.subheader("Staff Summary")
-    staff_summary = df.groupby(["date","staff"])[["litres","total","hours","paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().reset_index()
+    staff_summary = df.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount","hours"]].sum().reset_index()
     st.dataframe(staff_summary)
 
     st.subheader("Nozzle Sales")
@@ -237,25 +231,24 @@ elif menu_option == "Reports & Summary":
     st.dataframe(nozzle_sales)
 
     st.subheader("Creditors Outstanding (with Vehicle Details)")
-    credit_df = df[df["credit"]>0].copy()
+    credit_df = df[df["credit_amount"]>0].copy()
     if not credit_df.empty:
-        credit_report = credit_df[["date","staff","creditor_name","vehicle_number","credit","balance_cash"]]
+        credit_report = credit_df[["date","staff","creditor_name","vehicle_number","credit_amount","balance_cash"]]
         st.dataframe(credit_report)
         st.subheader("Vehicle-wise Credit Summary")
-        vehicle_summary = credit_df.groupby("vehicle_number")[["credit","balance_cash"]].sum().reset_index()
+        vehicle_summary = credit_df.groupby("vehicle_number")[["credit_amount","balance_cash"]].sum().reset_index()
         st.dataframe(vehicle_summary)
     else:
         st.info("No credit records found.")
 
     st.subheader("Monthly Summary")
-    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
+    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount","hours"]].sum().reset_index()
     st.dataframe(monthly_summary)
 
 # ---------------- ADMIN CONTROLS ----------------
 if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
     st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
     st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
-
     new_staff_admin = st.text_input("Staff Name", key="admin_new_staff")
     if st.button("Add Staff", key="admin_add_staff_btn"):
         try:
@@ -264,7 +257,6 @@ if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
             st.success("Staff Added")
         except:
             st.error("Staff Exists")
-
     new_creditor_admin = st.text_input("Creditor Name", key="admin_new_creditor")
     if st.button("Add Creditor", key="admin_add_creditor_btn"):
         try:
@@ -273,7 +265,6 @@ if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
             st.success("Creditor Added")
         except:
             st.error("Creditor Exists")
-
     for fuel in ["Petrol","Diesel","Power Petrol"]:
         new_price_admin = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"admin_price_{fuel}")
         if st.button(f"Update {fuel}", key=f"admin_update_{fuel}_btn"):
