@@ -49,7 +49,6 @@ conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
-# Insert only if fuel type does not exist
 for fuel, price in default_prices.items():
     cursor.execute("SELECT COUNT(*) FROM fuel_prices WHERE fuel=?", (fuel,))
     if cursor.fetchone()[0] == 0:
@@ -95,7 +94,7 @@ if "logged_in_admin" not in st.session_state:
 # ---------------- SIDEBAR MENU ----------------
 menu_options = ["Sales Entry", "Reports & Summary"]
 if st.session_state.get("logged_in_admin"):
-    menu_options.append("Admin Controls")  # Only visible after admin login
+    menu_options.append("Admin Controls")
 menu_option = st.sidebar.selectbox("Menu", menu_options)
 
 # ---------------- ADMIN LOGIN ----------------
@@ -152,11 +151,25 @@ if menu_option == "Sales Entry":
     balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit), 0)
     st.info(f"Balance Cash: ₹ {balance_cash}")
 
+    # ---------------- CREDITOR ENTRY ----------------
     creditor_name = ""
     vehicle_number = ""
-    if credit>0 and creditor_list:
-        creditor_name = st.selectbox("Select Creditor", creditor_list)
-        vehicle_number = st.text_input("Vehicle Number")
+    if credit > 0:
+        st.subheader("Creditor Details")
+        existing_creditor = st.selectbox("Select Existing Creditor (optional)", ["--None--"] + creditor_list, key="staff_select_creditor")
+        new_creditor = st.text_input("Or Add New Creditor Name", key="staff_new_creditor")
+        vehicle_number = st.text_input("Vehicle Number", key="staff_vehicle_number")
+        
+        if new_creditor.strip() != "":
+            cursor.execute("SELECT COUNT(*) FROM creditors WHERE name=?", (new_creditor.strip(),))
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor.strip(),))
+                conn.commit()
+                st.success(f"New creditor '{new_creditor.strip()}' added.")
+                creditor_list.append(new_creditor.strip())
+            creditor_name = new_creditor.strip()
+        elif existing_creditor != "--None--":
+            creditor_name = existing_creditor
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -177,7 +190,7 @@ if menu_option == "Sales Entry":
         try:
             st.experimental_rerun()
         except:
-            pass  # ignore rerun exception
+            pass
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
@@ -218,7 +231,6 @@ if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
     st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
     st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
 
-    # Add Staff - unique keys
     new_staff_admin = st.text_input("Staff Name", key="admin_new_staff")
     if st.button("Add Staff", key="admin_add_staff_btn"):
         try:
@@ -228,7 +240,6 @@ if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
         except:
             st.error("Staff Exists")
 
-    # Add Creditor - unique keys
     new_creditor_admin = st.text_input("Creditor Name", key="admin_new_creditor")
     if st.button("Add Creditor", key="admin_add_creditor_btn"):
         try:
@@ -238,7 +249,6 @@ if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
         except:
             st.error("Creditor Exists")
 
-    # Update Fuel Prices - unique keys
     for fuel in ["Petrol","Diesel","Power Petrol"]:
         new_price_admin = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"admin_price_{fuel}")
         if st.button(f"Update {fuel}", key=f"admin_update_{fuel}_btn"):
