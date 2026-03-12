@@ -30,7 +30,8 @@ creditor_name TEXT,
 duty_in TEXT,
 duty_out TEXT,
 hours REAL,
-ip_address TEXT
+ip_address TEXT,
+vehicle_number TEXT
 )
 """)
 
@@ -134,9 +135,11 @@ balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit), 0)
 st.info(f"Balance Cash: ₹ {balance_cash}")
 
 creditor_name = ""
+vehicle_number = ""
 if credit > 0:
     if creditor_list:
         creditor_name = st.selectbox("Select Creditor", creditor_list)
+        vehicle_number = st.text_input("Vehicle Number")
     else:
         st.warning("No creditors available. Contact admin to add a new creditor.")
 
@@ -151,11 +154,11 @@ ip_address = socket.gethostbyname(socket.gethostname())
 # ---------------- SAVE ENTRY ----------------
 if st.button("Save Entry"):
     cursor.execute("""
-    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
         paytm, hp_pay, cash, credit, advance_paid, balance_cash, creditor_name,
-        str(duty_in), str(duty_out), hours, ip_address
+        str(duty_in), str(duty_out), hours, ip_address, vehicle_number
     ))
     conn.commit()
     st.success("Entry Saved")
@@ -185,7 +188,7 @@ nozzle_sales = df.groupby("nozzle")["litres"].sum().reset_index()
 st.dataframe(nozzle_sales)
 
 # ---------------- CREDITORS REPORT ----------------
-credit_report = df.groupby("creditor_name")[["credit","balance_cash"]].sum().reset_index()
+credit_report = df.groupby(["creditor_name","vehicle_number"])[["credit","balance_cash"]].sum().reset_index()
 st.subheader("Creditors Outstanding")
 st.dataframe(credit_report)
 
