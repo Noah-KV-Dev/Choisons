@@ -1,13 +1,13 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from datetime import date, datetime
+from datetime import date
 
-# ---------------- PAGE ----------------
-st.set_page_config(page_title="Petrol Pump System", layout="wide")
+st.set_page_config(page_title="Petrol Pump System",layout="wide")
 
 # ---------------- DATABASE ----------------
-conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
+
+conn = sqlite3.connect("petrol_system.db",check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
@@ -27,19 +27,28 @@ card REAL
 """)
 
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
+cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE,price REAL)")
+
 conn.commit()
+
+# -------- DEFAULT FUEL PRICES --------
+
+cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES('Petrol',100)")
+cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES('Diesel',90)")
+conn.commit()
+
+fuel_df=pd.read_sql("SELECT * FROM fuel_price",conn)
+fuel_price=dict(zip(fuel_df["fuel"],fuel_df["price"]))
 
 # ---------------- CHECKLIST ----------------
 
-CHECKLIST_ITEMS = [
+CHECKLIST_ITEMS=[
 
 "Report on time in clean uniform with ID badge",
-"Before Duty Starts * Report on time in clean uniform with ID badge",
 "Guide vehicles to maintain smooth queue",
 "Check assigned pump machine condition",
 "Verify area is clean and hazard-free",
 "Confirm fire extinguisher location",
-
 "Greet customer politely and confirm fuel type",
 "Show ZERO reading before fueling",
 "Ask customer to switch off engine",
@@ -47,21 +56,18 @@ CHECKLIST_ITEMS = [
 "Stop exactly at requested amount",
 "Avoid fuel spoillage or overfilling",
 "Return nozzle and close cap if needed",
-
 "Collect correct payment (cash/UPI/card)",
 "Count cash in front of customer",
 "Issue receipt when required",
 "Inform cashier/manager for any issue",
 "Thank customer before they leave",
-
 "No smoking or mobile use near pumps",
-"Report leakage, smell, or machine fault immediately",
-"Do not argue with customers — call manager",
-"Follow all safety procedures of Hindustan Petroleum",
-
+"Report leakage or machine fault immediately",
+"Do not argue with customers call manager",
+"Follow all safety procedures of HP",
 "Keep pump area clean",
 "Report machine reading to manager",
-"Submit any pending receipts or issues",
+"Submit pending receipts or issues",
 "Hand over duty properly to next staff"
 
 ]
@@ -76,12 +82,12 @@ if st.session_state.checklist_date!=str(date.today()):
     st.session_state.checklist_state={i:False for i in CHECKLIST_ITEMS}
     st.session_state.checklist_applied=False
 
-# ---------------- ADMIN ----------------
+# ---------------- ADMIN LOGIN ----------------
 
 if "admin" not in st.session_state:
     st.session_state.admin=False
 
-st.sidebar.title("Admin")
+st.sidebar.title("Admin Login")
 
 user=st.sidebar.text_input("Username")
 pwd=st.sidebar.text_input("Password",type="password")
@@ -109,37 +115,37 @@ page=st.sidebar.selectbox("Menu",menu)
 
 if page=="Sales Entry":
 
-    st.title("Fuel Entry")
+    st.title("Fuel Sales Entry")
 
     if not st.session_state.checklist_applied:
 
         missing=[k for k,v in st.session_state.checklist_state.items() if not v]
 
         if missing:
-            st.error("Sales Blocked. Complete Staff Daily Checklist first.")
-            st.write("Missing Items:")
+            st.error("Sales Blocked. Complete Staff Daily Checklist First")
             for m in missing:
                 st.write("-",m)
-
             st.stop()
 
     staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
 
     staff=st.selectbox("Staff",staff_list)
 
-    fuel=st.selectbox("Fuel",["Petrol","Diesel"])
+    fuel=st.selectbox("Fuel Type",list(fuel_price.keys()))
+
+    price=fuel_price[fuel]
+
+    st.info(f"Fuel Price ₹ {price}")
 
     opening=st.number_input("Opening Meter",0.0)
 
     closing=st.number_input("Closing Meter",0.0)
 
-    price=st.number_input("Fuel Price",100.0)
-
     litres=max(closing-opening,0)
 
     total=litres*price
 
-    st.info(f"Litres {litres} | Amount ₹ {total}")
+    st.success(f"Litres {litres} | Amount ₹ {total}")
 
     cash=st.number_input("Cash",0.0)
 
@@ -167,9 +173,7 @@ elif page=="Reports":
 
     if not df.empty:
 
-        st.subheader("Daily Report")
-
-        day=st.date_input("Date",date.today())
+        day=st.date_input("Select Date",date.today())
 
         daily=df[df["date"]==str(day)]
 
@@ -181,7 +185,7 @@ elif page=="Reports":
 
             st.write("Total Sales ₹",daily["total"].sum())
 
-        st.subheader("Fuel Sales Chart")
+        st.subheader("Fuel Sales")
 
         st.bar_chart(df.groupby("fuel")["litres"].sum())
 
@@ -198,7 +202,6 @@ elif page=="Staff Daily Checklist":
     state=st.session_state.checklist_state
 
     for item in CHECKLIST_ITEMS:
-
         state[item]=st.checkbox(item,value=state[item])
 
     if st.button("Apply Checklist"):
@@ -206,16 +209,11 @@ elif page=="Staff Daily Checklist":
         missing=[k for k,v in state.items() if not v]
 
         if missing:
-
             st.error("Checklist incomplete")
-
             for m in missing:
                 st.write("-",m)
-
         else:
-
             st.session_state.checklist_applied=True
-
             st.success("Checklist Applied. Sales Entry Enabled")
 
 # ---------------- ADMIN CONTROLS ----------------
@@ -249,3 +247,16 @@ elif page=="Admin Controls":
         conn.commit()
 
         st.success("Staff Removed")
+
+    st.subheader("Change Fuel Price")
+
+    for f in fuel_price:
+
+        new_price=st.number_input(f,value=float(fuel_price[f]))
+
+        if st.button(f"Update {f}"):
+
+            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
+            conn.commit()
+
+            st.success(f"{f} Price Updated")
