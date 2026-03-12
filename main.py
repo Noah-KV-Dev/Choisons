@@ -263,28 +263,18 @@ elif page=="Admin Panel":
     st.subheader("Fuel Price Control")
     fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
     for index, row in fuel_df.iterrows():
-        col1, col2 = st.columns([2,1])
-        with col1:
-            fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
-        with col2:
-            fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
-        col3, col4 = st.columns([1,1])
-        with col3:
-            if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
-                try:
-                    cursor.execute(
-                        "UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",
-                        (fuel_name.strip(), fuel_price_val, row["fuel"])
-                    )
-                    conn.commit()
-                    st.success(f"Fuel '{row['fuel']}' Updated ✅")
-                except sqlite3.IntegrityError:
-                    st.error("Fuel Name Already Exists ❌")
-        with col4:
-            if st.button(f"Remove Fuel {row['fuel']}", key=f"remove_fuel_{index}"):
-                cursor.execute("DELETE FROM fuel_price WHERE fuel=?",(row["fuel"],))
+        fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
+        fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
+        if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
+            try:
+                cursor.execute(
+                    "UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",
+                    (fuel_name.strip(), fuel_price_val, row["fuel"])
+                )
                 conn.commit()
-                st.success(f"Fuel '{row['fuel']}' Removed ✅")
+                st.success(f"Fuel '{row['fuel']}' Updated ✅")
+            except sqlite3.IntegrityError:
+                st.error("Fuel Name Already Exists ❌")
 
     # ---------- SALES ENTRY MANAGEMENT ----------
     st.subheader("Manage Sales Entries")
