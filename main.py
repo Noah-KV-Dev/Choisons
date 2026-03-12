@@ -50,9 +50,7 @@ conn.commit()
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
 for fuel, price in default_prices.items():
-    cursor.execute("SELECT COUNT(*) FROM fuel_prices WHERE fuel=?", (fuel,))
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, price))
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, float(price)))
 conn.commit()
 
 # ---------------- PAGE CONFIG ----------------
@@ -151,31 +149,59 @@ if menu_option == "Sales Entry":
     advance_paid = st.number_input("Advance Paid", 0.0)
     credit = st.number_input("Total Credit Amount", min_value=0.0)
 
-# ---------------- DYNAMIC CREDITORS ----------------
-st.subheader("Creditors for this Sale (Amount Auto)")
-if "sale_creditors" not in st.session_state or not isinstance(st.session_state.sale_creditors, list):
-    st.session_state.sale_creditors = []
+    # ---------------- DYNAMIC CREDITORS ----------------
+    st.subheader("Creditors for this Sale (Amount Auto)")
+    if "sale_creditors" not in st.session_state or not isinstance(st.session_state.sale_creditors, list):
+        st.session_state.sale_creditors = []
 
-selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
-vehicle_number = st.text_input("Vehicle Number (Optional)")
+    selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
+    vehicle_number = st.text_input("Vehicle Number (Optional)")
 
-if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
-    existing_sum = sum([c.get("amount", 0) for c in st.session_state.sale_creditors])
-    remaining = max(credit - existing_sum, 0)
-    if remaining > 0:
-        st.session_state.sale_creditors.append({
-            "creditor_name": selected_creditor,
-            "vehicle_number": vehicle_number.strip(),
-            "amount": remaining
-        })
+    if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
+        existing_sum = sum([c.get("amount", 0) for c in st.session_state.sale_creditors])
+        remaining = max(credit - existing_sum, 0)
+        if remaining > 0:
+            st.session_state.sale_creditors.append({
+                "creditor_name": selected_creditor,
+                "vehicle_number": vehicle_number.strip(),
+                "amount": remaining
+            })
 
-# Safely compute auto_total_credit
-auto_total_credit = sum([c.get("amount", 0) for c in st.session_state.sale_creditors]) if st.session_state.sale_creditors else 0
-if st.session_state.sale_creditors:
-    st.table(pd.DataFrame(st.session_state.sale_creditors))
-st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
-balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
-st.info(f"Updated Balance Cash: ₹ {balance_cash}")pass
+    auto_total_credit = sum([c.get("amount", 0) for c in st.session_state.sale_creditors]) if st.session_state.sale_creditors else 0
+    if st.session_state.sale_creditors:
+        st.table(pd.DataFrame(st.session_state.sale_creditors))
+    st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
+    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
+    st.info(f"Updated Balance Cash: ₹ {balance_cash}")
+
+    duty_in = st.time_input("Duty IN")
+    duty_out = st.time_input("Duty OUT")
+    in_time = datetime.combine(date.today(), duty_in)
+    out_time = datetime.combine(date.today(), duty_out)
+    hours = max((out_time-in_time).total_seconds()/3600,0)
+    ip_address = socket.gethostbyname(socket.gethostname())
+
+    if st.button("Save Entry", key="save_sales_btn"):
+        if not st.session_state.sale_creditors:
+            cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+                paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
+                ip_address, "", "", 0
+            ))
+        else:
+            for creditor in st.session_state.sale_creditors:
+                cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                    str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+                    paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
+                    ip_address, creditor.get("creditor_name",""), creditor.get("vehicle_number",""),
+                    creditor.get("amount",0)
+                ))
+        conn.commit()
+        df = load_data()
+        st.session_state.sale_creditors = []
+        st.success("Entry Saved Successfully!")
+        try: st.experimental_rerun()
+        except: pass
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
