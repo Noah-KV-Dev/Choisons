@@ -170,7 +170,6 @@ df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number","creditor_name"]:
     if col not in df.columns:
         df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
-# Fill NaN values
 df["paytm"] = df["paytm"].fillna(0)
 df["hp_pay"] = df["hp_pay"].fillna(0)
 df["cash"] = df["cash"].fillna(0)
@@ -249,7 +248,11 @@ st.metric("Sales", staff_data["total"].sum())
 # ---------------- ADMIN PANEL ----------------
 st.sidebar.title("Admin Panel")
 
-# Admin Login/Logout
+# Track admin login status
+if "logged_in_admin" not in st.session_state:
+    st.session_state.logged_in_admin = None
+
+# Admin Login
 st.sidebar.subheader("Admin Login")
 admin_name = st.sidebar.text_input("Admin Username")
 if st.sidebar.button("Login as Admin"):
@@ -258,40 +261,48 @@ if st.sidebar.button("Login as Admin"):
     cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
                    (admin_name, str(login_time), ip_address))
     conn.commit()
+    st.session_state.logged_in_admin = admin_name
     st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
 
-if st.sidebar.button("Logout Admin"):
-    logout_time = datetime.now()
-    cursor.execute("UPDATE admin_logs SET logout_time=? WHERE admin_name=? AND logout_time IS NULL",
-                   (str(logout_time), admin_name))
-    conn.commit()
-    st.sidebar.success(f"Admin {admin_name} logged out at {logout_time.strftime('%H:%M:%S')}")
-
-# Add Staff
-new_staff = st.sidebar.text_input("Add Staff")
-if st.sidebar.button("Add Staff"):
-    try:
-        cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+# Admin Logout
+if st.session_state.logged_in_admin:
+    if st.sidebar.button("Logout Admin"):
+        logout_time = datetime.now()
+        cursor.execute("UPDATE admin_logs SET logout_time=? WHERE admin_name=? AND logout_time IS NULL",
+                       (str(logout_time), st.session_state.logged_in_admin))
         conn.commit()
-        st.sidebar.success("Staff Added")
-    except:
-        st.sidebar.error("Staff Exists")
+        st.sidebar.success(f"Admin {st.session_state.logged_in_admin} logged out at {logout_time.strftime('%H:%M:%S')}")
+        st.session_state.logged_in_admin = None
 
-# Add Creditor (Admin only)
-new_creditor = st.sidebar.text_input("Add Creditor")
-if st.sidebar.button("Add Creditor"):
-    try:
-        cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
-        conn.commit()
-        st.sidebar.success("Creditor Added")
-    except:
-        st.sidebar.error("Creditor Exists")
+# ---------------- ADMIN CONTROLS (ONLY IF LOGGED IN) ----------------
+if st.session_state.logged_in_admin:
 
-# Update Fuel Prices
-st.sidebar.subheader("Fuel Price Update")
-for fuel in ["Petrol","Diesel","Power Petrol"]:
-    new_price = st.sidebar.number_input(f"{fuel} Price",value=fuel_price_dict.get(fuel,100.0))
-    if st.sidebar.button(f"Update {fuel}"):
-        cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
-        conn.commit()
-        st.sidebar.success(f"{fuel} price updated")
+    st.sidebar.subheader("Add Staff")
+    new_staff = st.sidebar.text_input("Staff Name", key="new_staff")
+    if st.sidebar.button("Add Staff"):
+        try:
+            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+            conn.commit()
+            st.sidebar.success("Staff Added")
+        except:
+            st.sidebar.error("Staff Exists")
+
+    st.sidebar.subheader("Add Creditor")
+    new_creditor = st.sidebar.text_input("Creditor Name", key="new_creditor")
+    if st.sidebar.button("Add Creditor"):
+        try:
+            cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
+            conn.commit()
+            st.sidebar.success("Creditor Added")
+        except:
+            st.sidebar.error("Creditor Exists")
+
+    st.sidebar.subheader("Update Fuel Prices")
+    for fuel in ["Petrol","Diesel","Power Petrol"]:
+        new_price = st.sidebar.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
+        if st.sidebar.button(f"Update {fuel}"):
+            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+            conn.commit()
+            st.sidebar.success(f"{fuel} price updated")
+else:
+    st.sidebar.info("Login as admin to manage staff, creditors, and fuel prices")
