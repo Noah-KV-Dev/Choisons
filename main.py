@@ -151,7 +151,7 @@ if page=="Sales Entry":
         """,(
         str(date.today()),staff,nozzle,fuel,opening,closing,
         litres,price,total,paytm,sbi,hppay,advance,creditor,balance,
-        str(time_in),str(time_out),hours
+        time_in.strftime("%H:%M"),time_out.strftime("%H:%M"),hours
         ))
         conn.commit()
         st.success("Entry Saved")
@@ -193,7 +193,6 @@ if page=="Sales Entry":
 elif page=="Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
-    # Ensure all columns exist
     for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
         if col not in df.columns:
             df[col]=0
