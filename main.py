@@ -7,15 +7,13 @@ import socket
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
-# -------- ENTER KEY AUTO SUBMIT SCRIPT --------
+# -------- ENTER KEY AUTO SAVE --------
 st.markdown("""
 <script>
 document.addEventListener('keydown', function(e) {
     if (e.key === "Enter") {
         const btn = window.parent.document.querySelector('button[kind="primary"]');
-        if(btn){
-            btn.click();
-        }
+        if(btn){btn.click();}
     }
 });
 </script>
@@ -39,13 +37,13 @@ total REAL,
 paytm REAL,
 hp_pay REAL,
 cash REAL,
-advance_paid REAL,
+advance REAL,
 balance_cash REAL,
 duty_in TEXT,
 duty_out TEXT,
 hours REAL,
 ip_address TEXT,
-credit_sale REAL
+credit REAL
 )
 """)
 
@@ -64,21 +62,19 @@ ip_address TEXT
 
 conn.commit()
 
-# ---------------- DEFAULT PRICES ----------------
+# ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
 
 for fuel,price in default_prices.items():
-    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel,price) VALUES (?,?)",(fuel,price))
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices VALUES (?,?)",(fuel,price))
 
 conn.commit()
 
 # ---------------- FUNCTIONS ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-
     if not df.empty:
         df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
-
     return df
 
 def export_excel(data):
@@ -93,18 +89,35 @@ staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 
 # ---------------- TITLE ----------------
 st.title("⛽ Choisons Petrol Pump Management System")
-st.info("Super Fast Cashier Mode Enabled")
 
-# ---------------- SIDEBAR ----------------
-menu = st.sidebar.selectbox(
-"Menu",
-["Sales Entry","Reports"]
-)
+# ---------------- ADMIN LOGIN ----------------
+if "admin" not in st.session_state:
+    st.session_state.admin = False
+
+st.sidebar.subheader("Admin Login")
+
+user = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if st.sidebar.button("Login"):
+    if password == "admin786":
+        st.session_state.admin = True
+        st.sidebar.success("Admin Logged In")
+    else:
+        st.sidebar.error("Wrong Password")
+
+# ---------------- MENU ----------------
+menu = ["Sales Entry","Reports"]
+
+if st.session_state.admin:
+    menu.append("Admin Controls")
+
+page = st.sidebar.selectbox("Menu", menu)
 
 # ---------------- SALES ENTRY ----------------
-if menu == "Sales Entry":
+if page == "Sales Entry":
 
-    st.subheader("Fuel Entry (Fast Mode)")
+    st.subheader("Fuel Entry")
 
     col1,col2,col3 = st.columns(3)
 
@@ -119,17 +132,7 @@ if menu == "Sales Entry":
 
     price = fuel_price_dict.get(fuel,100)
 
-    # -------- AUTO NEXT NOZZLE --------
-    if "nozzle_index" not in st.session_state:
-        st.session_state.nozzle_index = 0
-
-    nozzle_list = [f"Nozzle {i}" for i in range(1,11)]
-
-    nozzle = st.selectbox(
-        "Nozzle",
-        nozzle_list,
-        index=st.session_state.nozzle_index
-    )
+    nozzle = st.selectbox("Nozzle",[f"Nozzle {i}" for i in range(1,11)])
 
     col4,col5 = st.columns(2)
 
@@ -139,32 +142,21 @@ if menu == "Sales Entry":
     with col5:
         closing = st.number_input("Closing Meter",0.0)
 
-    # -------- AUTO CALCULATE LITRES --------
-    litres = max(closing - opening,0)
+    litres = max(closing-opening,0)
 
-    total = litres * price
+    total = litres*price
 
-    st.success(f"Litres: {litres} L  |  Amount ₹ {total}")
+    st.success(f"Litres: {litres}  |  Amount ₹ {total}")
 
-    # -------- PAYMENTS --------
     st.subheader("Payments")
 
     col1,col2,col3,col4,col5 = st.columns(5)
 
-    with col1:
-        paytm = st.number_input("Paytm",0.0)
-
-    with col2:
-        hp_pay = st.number_input("HP Pay",0.0)
-
-    with col3:
-        cash = st.number_input("Cash",0.0)
-
-    with col4:
-        advance = st.number_input("Advance",0.0)
-
-    with col5:
-        credit = st.number_input("Credit",0.0)
+    with col1: paytm = st.number_input("Paytm",0.0)
+    with col2: hp_pay = st.number_input("HP Pay",0.0)
+    with col3: cash = st.number_input("Cash",0.0)
+    with col4: advance = st.number_input("Advance",0.0)
+    with col5: credit = st.number_input("Credit",0.0)
 
     balance_cash = max(total-(paytm+hp_pay+cash+advance+credit),0)
 
@@ -173,14 +165,13 @@ if menu == "Sales Entry":
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
 
-    in_time = datetime.combine(date.today(),duty_in)
-    out_time = datetime.combine(date.today(),duty_out)
+    in_time = datetime.combine(date.today(), duty_in)
+    out_time = datetime.combine(date.today(), duty_out)
 
     hours = max((out_time-in_time).total_seconds()/3600,0)
 
     ip = socket.gethostbyname(socket.gethostname())
 
-    # -------- SAVE ENTRY --------
     if st.button("Save Entry", type="primary"):
 
         cursor.execute("""
@@ -191,58 +182,22 @@ if menu == "Sales Entry":
 
         conn.commit()
 
-        # -------- AUTO NEXT NOZZLE --------
-        st.session_state.nozzle_index += 1
-        if st.session_state.nozzle_index >= len(nozzle_list):
-            st.session_state.nozzle_index = 0
-
-        st.success("Saved ✔")
+        st.success("Entry Saved")
 
         st.rerun()
 
-    # -------- CASH SHORTAGE --------
-    st.subheader("Cash Closing")
-
-    system_cash = paytm + hp_pay + cash
-
-    closing_cash = st.number_input("Actual Cash")
-
-    shortage = closing_cash - system_cash
-
-    if st.button("Check Cash"):
-
-        cursor.execute("""
-        INSERT INTO cash_closing VALUES (?,?,?,?,?)
-        """,(str(entry_date),system_cash,closing_cash,shortage,ip))
-
-        conn.commit()
-
-        if shortage == 0:
-            st.success("Cash Perfect")
-
-        elif shortage < 0:
-            st.error(f"Shortage ₹ {shortage}")
-
-        else:
-            st.warning(f"Extra ₹ {shortage}")
-
 # ---------------- REPORTS ----------------
-elif menu == "Reports":
+elif page == "Reports":
 
     st.subheader("Dashboard")
 
     col1,col2,col3 = st.columns(3)
 
-    with col1:
-        st.metric("Total Litres", df["litres"].sum())
+    with col1: st.metric("Total Litres", df["litres"].sum())
+    with col2: st.metric("Total Sales ₹", df["total"].sum())
+    with col3: st.metric("Total Hours", df["hours"].sum())
 
-    with col2:
-        st.metric("Total Sales ₹", df["total"].sum())
-
-    with col3:
-        st.metric("Total Hours", df["hours"].sum())
-
-    st.subheader("Fuel Sales")
+    st.subheader("Fuel Sales Chart")
     st.bar_chart(df.groupby("fuel")["litres"].sum())
 
     st.subheader("Staff Performance")
@@ -256,8 +211,60 @@ elif menu == "Reports":
     csv = export_excel(df)
 
     st.download_button(
-        "Download Excel",
+        "Download Excel Report",
         csv,
         "petrol_sales.csv",
         "text/csv"
     )
+
+# ---------------- ADMIN CONTROLS ----------------
+elif page == "Admin Controls":
+
+    st.subheader("Admin Controls")
+
+    st.write("### Add Staff")
+    new_staff = st.text_input("Staff Name")
+
+    if st.button("Add Staff"):
+        try:
+            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+            conn.commit()
+            st.success("Staff Added")
+        except:
+            st.error("Staff already exists")
+
+    st.divider()
+
+    st.write("### Remove Staff")
+
+    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+
+    remove_staff = st.selectbox("Select Staff", staff_list)
+
+    if st.button("Remove Staff"):
+        cursor.execute("DELETE FROM staff WHERE name=?", (remove_staff,))
+        conn.commit()
+        st.success(f"{remove_staff} removed")
+        st.rerun()
+
+    st.divider()
+
+    st.write("### Update Fuel Prices")
+
+    for fuel in ["Petrol","Diesel","Power Petrol"]:
+
+        new_price = st.number_input(
+            fuel,
+            value=float(fuel_price_dict.get(fuel,100))
+        )
+
+        if st.button(f"Update {fuel}"):
+
+            cursor.execute(
+                "UPDATE fuel_prices SET price=? WHERE fuel=?",
+                (new_price,fuel)
+            )
+
+            conn.commit()
+
+            st.success(f"{fuel} price updated")
