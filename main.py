@@ -79,11 +79,13 @@ else:
 
 # ---------------- READ SALES ----------------
 def read_sales():
+    """Read all sales entries and ensure date is string type"""
     try:
         df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
         for col in ["opening","closing","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","time_in","time_out","hours","nozzle"]:
             if col not in df.columns: df[col]=0
-        df['date'] = df['date'].astype(str)  # Ensure date column is string
+        # Convert date column to consistent string format
+        df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         return df
     except:
         create_tables()
@@ -158,7 +160,7 @@ if page=="Sales Entry":
         except Exception as e:
             st.error(f"Error Saving Entry: {e}")
 
-    # Today summary
+    # Today summary including previous sales
     st.markdown("---")
     df_today = read_sales()
     today_sales = df_today[df_today["date"]==sale_date.strftime("%Y-%m-%d")]
