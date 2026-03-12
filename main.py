@@ -259,30 +259,32 @@ elif page=="Admin Panel":
             conn.commit()
             st.success(f"Staff '{remove_staff}' Removed ✅")
 
-# ---------- FUEL PRICE CONTROL ----------
-st.subheader("Fuel Price Control")
-fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
-for index, row in fuel_df.iterrows():
-    col1, col2 = st.columns([2,1])
-    with col1:
-        fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
-    with col2:
-        fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
-    col3, col4 = st.columns([1,1])
-    with col3:
-        if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
-            try:
-                cursor.execute("UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",(fuel_name.strip(), fuel_price_val, row["fuel"]))
+    # ---------- FUEL PRICE CONTROL ----------
+    st.subheader("Fuel Price Control")
+    fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
+    for index, row in fuel_df.iterrows():
+        col1, col2 = st.columns([2,1])
+        with col1:
+            fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
+        with col2:
+            fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
+        col3, col4 = st.columns([1,1])
+        with col3:
+            if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
+                try:
+                    cursor.execute(
+                        "UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",
+                        (fuel_name.strip(), fuel_price_val, row["fuel"])
+                    )
+                    conn.commit()
+                    st.success(f"Fuel '{row['fuel']}' Updated ✅")
+                except sqlite3.IntegrityError:
+                    st.error("Fuel Name Already Exists ❌")
+        with col4:
+            if st.button(f"Remove Fuel {row['fuel']}", key=f"remove_fuel_{index}"):
+                cursor.execute("DELETE FROM fuel_price WHERE fuel=?",(row["fuel"],))
                 conn.commit()
-                st.success(f"Fuel '{row['fuel']}' Updated ✅")  # <-- FIXED
-            except sqlite3.IntegrityError:
-                st.error("Fuel Name Already Exists ❌")
-    with col4:
-        if st.button(f"Remove Fuel {row['fuel']}", key=f"remove_fuel_{index}"):
-            cursor.execute("DELETE FROM fuel_price WHERE fuel=?",(row["fuel"],))
-            conn.commit()
-            st.success(f"Fuel '{row['fuel']}' Removed ✅")  # <-- FIXED
-
+                st.success(f"Fuel '{row['fuel']}' Removed ✅")
 
     # ---------- SALES ENTRY MANAGEMENT ----------
     st.subheader("Manage Sales Entries")
@@ -303,8 +305,14 @@ for index, row in fuel_df.iterrows():
         # Editable fields
         col1, col2 = st.columns(2)
         with col1:
-            staff_edit = st.selectbox("Staff", staff_list, index=staff_list.index(entry["staff"]) if entry["staff"] in staff_list else 0)
-            fuel_edit = st.selectbox("Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry["fuel"]) if entry["fuel"] in fuel_price else 0)
+            staff_edit = st.selectbox(
+                "Staff", staff_list,
+                index=staff_list.index(entry["staff"]) if entry["staff"] in staff_list else 0
+            )
+            fuel_edit = st.selectbox(
+                "Fuel", list(fuel_price.keys()),
+                index=list(fuel_price.keys()).index(entry["fuel"]) if entry["fuel"] in fuel_price else 0
+            )
             nozzle_edit = st.number_input("Nozzle", min_value=1, max_value=12, value=int(entry["nozzle"]))
             opening_edit = st.number_input("Opening Meter", value=float(entry["opening"]), step=0.01, format="%.2f")
             closing_edit = st.number_input("Closing Meter", value=float(entry["closing"]), step=0.01, format="%.2f")
@@ -343,4 +351,3 @@ for index, row in fuel_df.iterrows():
             st.success("Sales Entry Deleted ✅")
     else:
         st.info("No sales entries available to manage.")
-['fuel']}' Removed ✅")
