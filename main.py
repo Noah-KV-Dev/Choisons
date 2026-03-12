@@ -14,10 +14,8 @@ cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
-date TEXT, staff TEXT, opening REAL, closing REAL, litres REAL,
-fuel TEXT, price REAL, total REAL,
-paytm REAL, sbi REAL, hppay REAL, advance REAL, creditor REAL, balance REAL,
-time_in TEXT, time_out TEXT, hours REAL
+date TEXT, staff TEXT, opening REAL, closing REAL,
+fuel TEXT
 )
 """)
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
@@ -25,15 +23,27 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price RE
 cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
 conn.commit()
 
-# ---------------- ENSURE TABLE COLUMNS ----------------
+# ---------------- ENSURE REQUIRED COLUMNS ----------------
+required_columns = {
+    "nozzle": "INTEGER DEFAULT 1",
+    "litres": "REAL DEFAULT 0",
+    "price": "REAL DEFAULT 0",
+    "total": "REAL DEFAULT 0",
+    "paytm": "REAL DEFAULT 0",
+    "sbi": "REAL DEFAULT 0",
+    "hppay": "REAL DEFAULT 0",
+    "advance": "REAL DEFAULT 0",
+    "creditor": "REAL DEFAULT 0",
+    "balance": "REAL DEFAULT 0",
+    "time_in": "TEXT DEFAULT '00:00'",
+    "time_out": "TEXT DEFAULT '00:00'",
+    "hours": "REAL DEFAULT 0"
+}
+
 existing_columns = [c[1] for c in cursor.execute("PRAGMA table_info(sales)").fetchall()]
-required_columns = ["nozzle","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","hours"]
-for col in required_columns:
+for col, col_type in required_columns.items():
     if col not in existing_columns:
-        if col=="nozzle":
-            cursor.execute("ALTER TABLE sales ADD COLUMN nozzle INTEGER DEFAULT 1")
-        else:
-            cursor.execute(f"ALTER TABLE sales ADD COLUMN {col} REAL DEFAULT 0")
+        cursor.execute(f"ALTER TABLE sales ADD COLUMN {col} {col_type}")
 conn.commit()
 
 # Default fuel prices
