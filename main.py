@@ -10,11 +10,14 @@ st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Create tables if not exist
+# Base tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
-date TEXT, staff TEXT, opening REAL, closing REAL,
+date TEXT,
+staff TEXT,
+opening REAL,
+closing REAL,
 fuel TEXT
 )
 """)
@@ -23,7 +26,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price RE
 cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
 conn.commit()
 
-# ---------------- ENSURE REQUIRED COLUMNS ----------------
+# Ensure required columns
 required_columns = {
     "nozzle": "INTEGER DEFAULT 1",
     "litres": "REAL DEFAULT 0",
@@ -39,7 +42,6 @@ required_columns = {
     "time_out": "TEXT DEFAULT '00:00'",
     "hours": "REAL DEFAULT 0"
 }
-
 existing_columns = [c[1] for c in cursor.execute("PRAGMA table_info(sales)").fetchall()]
 for col, col_type in required_columns.items():
     if col not in existing_columns:
@@ -139,7 +141,7 @@ if page=="Sales Entry":
     balance = round(total-(paytm+sbi+hppay+advance+creditor),2)
     st.warning(f"Balance Cash ₹ {balance}")
 
-    # ---------------- SAVE ENTRY ----------------
+    # Save
     if st.button("Save Entry"):
         try:
             cursor.execute("""
@@ -157,33 +159,6 @@ if page=="Sales Entry":
             st.success("Sales Entry Saved Successfully ✅")
         except Exception as e:
             st.error(f"Error Saving Entry: {e}")
-
-    # ---------------- TODAY SUMMARY ----------------
-    st.markdown("---")
-    st.subheader("Today Staff Summary")
-    df = pd.read_sql("SELECT * FROM sales",conn)
-    today = df[df["date"]==str(date.today())]
-    if not today.empty:
-        summary = today.groupby("staff").agg(
-            Opening=("opening","sum"),
-            Closing=("closing","sum"),
-            Litres=("litres","sum"),
-            Sales=("total","sum"),
-            Paytm=("paytm","sum"),
-            SBI=("sbi","sum"),
-            HPPay=("hppay","sum"),
-            Advance=("advance","sum"),
-            Creditor=("creditor","sum"),
-            CashBalance=("balance","sum"),
-            Hours=("hours","sum")
-        ).reset_index()
-        summary["Cash Short"]=summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
-        summary["Cash Excess"]=summary["CashBalance"].apply(lambda x: x if x>0 else 0)
-        st.dataframe(summary,use_container_width=True)
-        st.subheader("Staff Litre Graph Today")
-        st.bar_chart(summary.set_index("staff")["Litres"])
-    else:
-        st.info("No sales entries for today")
 
 # ---------------- REPORTS ----------------
 elif page=="Reports":
