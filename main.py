@@ -236,25 +236,64 @@ elif page=="Staff Daily Checklist":
 # ---------------- ADMIN PANEL ----------------
 elif page=="Admin Panel":
     st.title("Admin Panel")
-    new_staff=st.text_input("Add Staff")
+
+    # ---------- STAFF MANAGEMENT ----------
+    st.subheader("Staff Management")
+    new_staff = st.text_input("Add New Staff")
     if st.button("Add Staff"):
-        try:
-            cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
-            conn.commit()
-            st.success("Staff Added")
-        except:
-            st.error("Staff Exists")
-    staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
+        if new_staff.strip() != "":
+            try:
+                cursor.execute("INSERT INTO staff(name) VALUES(?)",(new_staff.strip(),))
+                conn.commit()
+                st.success(f"Staff '{new_staff}' Added ✅")
+            except sqlite3.IntegrityError:
+                st.error("Staff Already Exists ❌")
+        else:
+            st.warning("Enter a valid staff name")
+
+    staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
     if staff_list:
-        remove=st.selectbox("Remove Staff",staff_list)
-        if st.button("Remove Staff"):
-            cursor.execute("DELETE FROM staff WHERE name=?",(remove,))
+        # Remove Staff
+        remove_staff = st.selectbox("Remove Staff", staff_list)
+        if st.button("Remove Selected Staff"):
+            cursor.execute("DELETE FROM staff WHERE name=?",(remove_staff,))
             conn.commit()
-            st.success("Staff Removed")
+            st.success(f"Staff '{remove_staff}' Removed ✅")
+        
+        # Edit Staff Name
+        edit_staff = st.selectbox("Edit Staff Name", staff_list, key="edit_staff_select")
+        new_name = st.text_input("New Name", key="new_staff_name")
+        if st.button("Update Staff Name"):
+            if new_name.strip() != "":
+                try:
+                    cursor.execute("UPDATE staff SET name=? WHERE name=?",(new_name.strip(), edit_staff))
+                    conn.commit()
+                    st.success(f"Staff '{edit_staff}' Updated to '{new_name}' ✅")
+                except sqlite3.IntegrityError:
+                    st.error("This staff name already exists ❌")
+            else:
+                st.warning("Enter a valid new name")
+
+    # ---------- FUEL PRICE CONTROL ----------
     st.subheader("Fuel Price Control")
-    for f in fuel_price:
-        new_price=st.number_input(f,value=float(fuel_price[f]))
-        if st.button(f"Update {f}"):
-            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
-            conn.commit()
-            st.success("Price Updated")
+    fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
+    for index, row in fuel_df.iterrows():
+        col1, col2 = st.columns([2,1])
+        with col1:
+            fuel_name = st.text_input(f"Fuel Name (Edit)", value=row["fuel"], key=f"fuel_name_{index}")
+        with col2:
+            fuel_price_val = st.number_input(f"Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
+        col3, col4 = st.columns([1,1])
+        with col3:
+            if st.button(f"Update Fuel {row['fuel']}", key=f"update_fuel_{index}"):
+                try:
+                    cursor.execute("UPDATE fuel_price SET fuel=?, price=? WHERE fuel=?",(fuel_name.strip(), fuel_price_val, row["fuel"]))
+                    conn.commit()
+                    st.success(f"Fuel '{row['fuel']}' Updated ✅")
+                except sqlite3.IntegrityError:
+                    st.error("Fuel Name Already Exists ❌")
+        with col4:
+            if st.button(f"Remove Fuel {row['fuel']}", key=f"remove_fuel_{index}"):
+                cursor.execute("DELETE FROM fuel_price WHERE fuel=?",(row["fuel"],))
+                conn.commit()
+                st.success(f"Fuel '{row['fuel']}' Removed ✅")
