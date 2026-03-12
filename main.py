@@ -258,3 +258,41 @@ elif page=="Admin Panel":
             cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
             conn.commit()
             st.success("Price Updated")
+             # --- Sales Data Edit/Delete ---
+    st.subheader("Edit / Delete Sales Entry")
+    sales_df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC",conn)
+    if not sales_df.empty:
+        selected_id = st.selectbox("Select Sale ID", sales_df["id"].tolist())
+        record = sales_df[sales_df["id"]==selected_id].iloc[0]
+
+        # Editable fields
+        staff_edit = st.selectbox("Staff", pd.read_sql("SELECT name FROM staff",conn)["name"].tolist(), index=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist().index(record["staff"]))
+        fuel_edit = st.selectbox("Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(record["fuel"]))
+        nozzle_edit = st.number_input("Nozzle", value=int(record["nozzle"]), min_value=1, max_value=12)
+        opening_edit = st.number_input("Opening", value=float(record["opening"]))
+        closing_edit = st.number_input("Closing", value=float(record["closing"]))
+        litres_edit = round(max(closing_edit-opening_edit,0),2)
+        price_edit = float(fuel_price[fuel_edit])
+        total_edit = round(litres_edit*price_edit,2)
+        paytm_edit = st.number_input("Paytm", value=float(record["paytm"]))
+        sbi_edit = st.number_input("SBI", value=float(record["sbi"]))
+        hppay_edit = st.number_input("HP Pay", value=float(record["hppay"]))
+        advance_edit = st.number_input("Advance", value=float(record["advance"]))
+        creditor_edit = st.number_input("Creditor", value=float(record["creditor"]))
+        balance_edit = round(total_edit-(paytm_edit+sbi_edit+hppay_edit+advance_edit+creditor_edit),2)
+        st.warning(f"Balance Cash ₹ {balance_edit}")
+
+        if st.button("Update Sale"):
+            cursor.execute("""
+                UPDATE sales SET staff=?, fuel=?, nozzle=?, opening=?, closing=?, litres=?, price=?, total=?,
+                paytm=?, sbi=?, hppay=?, advance=?, creditor=?, balance=?
+                WHERE id=?
+            """, (staff_edit, fuel_edit, nozzle_edit, opening_edit, closing_edit, litres_edit, price_edit, total_edit,
+                  paytm_edit, sbi_edit, hppay_edit, advance_edit, creditor_edit, balance_edit, selected_id))
+            conn.commit()
+            st.success("Sale Updated ✅")
+
+        if st.button("Delete Sale"):
+            cursor.execute("DELETE FROM sales WHERE id=?",(selected_id,))
+            conn.commit()
+            st.success("Sale Deleted ✅")
