@@ -16,11 +16,16 @@ Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com
 Created by Nazeeh
 """)
 
+import streamlit as st
+import pandas as pd
+import sqlite3
+from datetime import date, datetime, time
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
+# Create tables if not exist
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +40,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price RE
 cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
 conn.commit()
 
-# ---------------- DEFAULT FUEL PRICES ----------------
+# Default fuel prices
 default_fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
 for f,p in default_fuels.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
@@ -95,7 +100,7 @@ if page=="Sales Entry":
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-    # Nozzle and opening
+    # Nozzle selection and opening meter
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
     try:
         nozzle_int = int(nozzle)
@@ -103,9 +108,13 @@ if page=="Sales Entry":
         st.error("Invalid nozzle selected")
         st.stop()
 
-    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle_int,))
-    last = cursor.fetchone()
-    opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    try:
+        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle_int,))
+        last = cursor.fetchone()
+        opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    except:
+        opening_default = 0.0
+
     opening = st.number_input("Opening Meter", value=opening_default)
     closing = st.number_input("Closing Meter",0.0)
     litres = round(max(closing-opening,0),2)
