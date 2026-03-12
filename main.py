@@ -5,6 +5,17 @@ from datetime import date, datetime, time
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+# ---------------- TITLE & CONTACT ----------------
+st.title("⛽ Choisons Petrol Pump Management System")
+st.info("""
+*Contact Details*  
+
+Phone: +91 8590304889  
+Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  
+
+Created by Nazeeh
+""")
+
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
@@ -86,7 +97,13 @@ if page=="Sales Entry":
 
     # Nozzle and opening
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
-    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(int(nozzle),))
+    try:
+        nozzle_int = int(nozzle)
+    except:
+        st.error("Invalid nozzle selected")
+        st.stop()
+
+    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle_int,))
     last = cursor.fetchone()
     opening_default = float(last[0]) if last and last[0] is not None else 0.0
     opening = st.number_input("Opening Meter", value=opening_default)
@@ -118,7 +135,7 @@ if page=="Sales Entry":
         paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours
         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,(
-        str(date.today()),staff,nozzle,fuel,opening,closing,
+        str(date.today()),staff,nozzle_int,fuel,opening,closing,
         litres,price,total,paytm,sbi,hppay,advance,creditor,balance,
         t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours
         ))
