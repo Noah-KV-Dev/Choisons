@@ -37,7 +37,15 @@ vehicle_number TEXT
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS creditors(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS fuel_prices(fuel TEXT UNIQUE,price REAL)")
-cursor.execute("CREATE TABLE IF NOT EXISTS admin_logs(id INTEGER PRIMARY KEY AUTOINCREMENT,admin_name TEXT,login_time TEXT,logout_time TEXT,ip_address TEXT)")
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS admin_logs(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+admin_name TEXT,
+login_time TEXT,
+logout_time TEXT,
+ip_address TEXT
+)
+""")
 conn.commit()
 
 # Default fuel prices
@@ -84,14 +92,18 @@ if "logged_in_admin" not in st.session_state:
 
 st.sidebar.subheader("Admin Login")
 admin_name = st.sidebar.text_input("Admin Username")
+admin_password = st.sidebar.text_input("Password", type="password")
 if st.sidebar.button("Login as Admin"):
-    login_time = datetime.now()
-    ip_address = socket.gethostbyname(socket.gethostname())
-    cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
-                   (admin_name, str(login_time), ip_address))
-    conn.commit()
-    st.session_state.logged_in_admin = admin_name
-    st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
+    if admin_password == "admin786":
+        login_time = datetime.now()
+        ip_address = socket.gethostbyname(socket.gethostname())
+        cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
+                       (admin_name, str(login_time), ip_address))
+        conn.commit()
+        st.session_state.logged_in_admin = admin_name
+        st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
+    else:
+        st.sidebar.error("Incorrect Password!")
 
 if st.session_state.logged_in_admin:
     if st.sidebar.button("Logout Admin"):
@@ -152,6 +164,28 @@ if menu_option == "Sales Entry":
         ))
         conn.commit()
         st.success("Entry Saved")
+        df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+        df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+
+    # ---------------- DAILY SUMMARY ----------------
+    st.subheader("Daily Summary (Per Staff)")
+    daily_data = df[df["date"]==str(date.today())]
+    if not daily_data.empty:
+        daily_summary = daily_data.groupby("staff")[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
+        st.dataframe(daily_summary)
+    else:
+        st.info("No sales today.")
+
+    # ---------------- MONTHLY SUMMARY ----------------
+    st.subheader("Monthly Summary (Per Staff)")
+    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+    month_period = pd.Period(str(date.today()), freq='M')
+    monthly_data = df[df['month']==month_period]
+    if not monthly_data.empty:
+        monthly_summary = monthly_data.groupby("staff")[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
+        st.dataframe(monthly_summary)
+    else:
+        st.info("No sales this month.")
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
@@ -181,7 +215,6 @@ elif menu_option == "Reports & Summary":
     st.dataframe(credit_report)
 
     st.subheader("Monthly Summary")
-    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
     monthly_summary = df.groupby('month')[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash"]].sum().reset_index()
     st.dataframe(monthly_summary)
 
