@@ -49,7 +49,6 @@ completed INTEGER,
 PRIMARY KEY(date,staff)
 )
 """)
-
 conn.commit()
 
 # ---------------- DEFAULT FUELS ----------------
@@ -162,6 +161,12 @@ if page=="Sales Entry":
     st.subheader("Today Staff Summary")
     df = pd.read_sql("SELECT * FROM sales",conn)
     today = df[df["date"]==str(date.today())]
+
+    # Ensure all columns exist
+    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
+        if col not in today.columns:
+            today[col]=0
+
     if len(today)>0:
         summary = today.groupby("staff").agg(
             Opening=("opening","sum"),
@@ -181,11 +186,18 @@ if page=="Sales Entry":
         st.dataframe(summary,use_container_width=True)
         st.subheader("Staff Litre Graph Today")
         st.bar_chart(summary.set_index("staff")["Litres"])
+    else:
+        st.info("No sales entries for today")
 
 # ---------------- REPORTS ----------------
 elif page=="Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
+    # Ensure all columns exist
+    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
+        if col not in df.columns:
+            df[col]=0
+
     report_type = st.selectbox("Report Type",["Daily","Monthly"])
     if report_type=="Daily":
         d = st.date_input("Select Date",date.today())
