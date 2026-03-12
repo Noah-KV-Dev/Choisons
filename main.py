@@ -49,8 +49,11 @@ conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
+# Insert only if fuel type does not exist
 for fuel, price in default_prices.items():
-    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, float(price)))
+    cursor.execute("SELECT COUNT(*) FROM fuel_prices WHERE fuel=?", (fuel,))
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, price))
 conn.commit()
 
 # ---------------- PAGE CONFIG ----------------
