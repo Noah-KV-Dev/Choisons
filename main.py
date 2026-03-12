@@ -5,7 +5,16 @@ from datetime import date, datetime, time
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+# ---------------- TITLE & CONTACT ----------------
+st.title("⛽ Choisons Petrol Pump Management System")
+st.info("""
+*Contact Details*  
 
+Phone: +91 8590304889  
+Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  
+
+Created by Nazeeh
+""")
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
