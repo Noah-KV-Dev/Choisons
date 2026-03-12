@@ -276,3 +276,5 @@ elif page=="Admin Panel":
             cursor.execute("DELETE FROM sales WHERE id=?",(selected_id,))
             conn.commit()
             st.success("Sale Deleted ✅")
+
+
