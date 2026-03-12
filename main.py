@@ -10,45 +10,40 @@ st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Base tables
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS sales(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-date TEXT,
-staff TEXT,
-opening REAL,
-closing REAL,
-fuel TEXT
-)
-""")
-cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
-cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
-cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
-conn.commit()
+# --- CREATE OR FIX TABLES ---
+def create_tables():
+    # Base table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sales(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT,
+        staff TEXT,
+        opening REAL DEFAULT 0,
+        closing REAL DEFAULT 0,
+        fuel TEXT,
+        nozzle INTEGER DEFAULT 1,
+        litres REAL DEFAULT 0,
+        price REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        paytm REAL DEFAULT 0,
+        sbi REAL DEFAULT 0,
+        hppay REAL DEFAULT 0,
+        advance REAL DEFAULT 0,
+        creditor REAL DEFAULT 0,
+        balance REAL DEFAULT 0,
+        time_in TEXT DEFAULT '00:00',
+        time_out TEXT DEFAULT '00:00',
+        hours REAL DEFAULT 0
+    )
+    """)
+    cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
+    conn.commit()
 
-# Ensure required columns
-required_columns = {
-    "nozzle": "INTEGER DEFAULT 1",
-    "litres": "REAL DEFAULT 0",
-    "price": "REAL DEFAULT 0",
-    "total": "REAL DEFAULT 0",
-    "paytm": "REAL DEFAULT 0",
-    "sbi": "REAL DEFAULT 0",
-    "hppay": "REAL DEFAULT 0",
-    "advance": "REAL DEFAULT 0",
-    "creditor": "REAL DEFAULT 0",
-    "balance": "REAL DEFAULT 0",
-    "time_in": "TEXT DEFAULT '00:00'",
-    "time_out": "TEXT DEFAULT '00:00'",
-    "hours": "REAL DEFAULT 0"
-}
-existing_columns = [c[1] for c in cursor.execute("PRAGMA table_info(sales)").fetchall()]
-for col, col_type in required_columns.items():
-    if col not in existing_columns:
-        cursor.execute(f"ALTER TABLE sales ADD COLUMN {col} {col_type}")
-conn.commit()
+create_tables()
 
-# Default fuel prices
+# --- DEFAULT FUELS ---
 default_fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
 for f,p in default_fuels.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
@@ -71,8 +66,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
     pw = st.sidebar.text_input("Password",type="password")
-    login_clicked = st.sidebar.button("Login")
-    if login_clicked:
+    if st.sidebar.button("Login"):
         if pw=="admin786":
             st.session_state.admin=True
             st.success("Admin Logged In ✅")
@@ -80,10 +74,22 @@ if not st.session_state.admin:
             st.sidebar.error("Wrong Password")
 else:
     st.sidebar.success("Admin Logged In")
-    logout_clicked = st.sidebar.button("Logout")
-    if logout_clicked:
+    if st.sidebar.button("Logout"):
         st.session_state.admin=False
         st.success("Logged Out ✅")
+
+# ---------------- UTILITY TO READ SALES SAFELY ----------------
+def read_sales():
+    try:
+        df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
+        # Ensure all columns exist
+        for col in ["opening","closing","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","time_in","time_out","hours","nozzle"]:
+            if col not in df.columns:
+                df[col]=0
+        return df
+    except:
+        create_tables()
+        return pd.DataFrame(columns=["id","date","staff","nozzle","fuel","opening","closing","litres","price","total","paytm","sbi","hppay","advance","creditor","balance","time_in","time_out","hours"])
 
 # ---------------- SALES ENTRY ----------------
 if page=="Sales Entry":
@@ -110,7 +116,7 @@ if page=="Sales Entry":
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-    # Nozzle and opening meter
+    # Nozzle and opening
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
     nozzle_int = int(nozzle)
     try:
@@ -119,20 +125,16 @@ if page=="Sales Entry":
         opening_default = float(last[0]) if last and last[0] is not None else 0.0
     except:
         opening_default = 0.0
-
     opening = st.number_input("Opening Meter", value=opening_default, step=0.01, format="%.2f")
     closing = st.number_input("Closing Meter",0.0, step=0.01, format="%.2f")
     litres = round(max(closing-opening,0),2)
 
-    # Fuel selection
+    # Fuel and payments
     fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
     price = float(fuel_price[fuel])
-    st.info(f"Fuel Price ₹ {price}")
     total = round(litres*price,2)
-    st.success(f"Litres {litres} | Amount ₹ {total}")
+    st.info(f"Litres {litres} | Amount ₹ {total}")
 
-    # Payments
-    st.subheader("Payments")
     paytm = float(st.number_input("Paytm",0.0, step=0.01))
     sbi = float(st.number_input("SBI",0.0, step=0.01))
     hppay = float(st.number_input("HP Pay",0.0, step=0.01))
@@ -141,112 +143,31 @@ if page=="Sales Entry":
     balance = round(total-(paytm+sbi+hppay+advance+creditor),2)
     st.warning(f"Balance Cash ₹ {balance}")
 
-    # Save
     if st.button("Save Entry"):
         try:
             cursor.execute("""
-                INSERT INTO sales(
-                date, staff, nozzle, fuel, opening, closing, litres, price, total,
-                paytm, sbi, hppay, advance, creditor, balance,
-                time_in, time_out, hours
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,(
-                str(date.today()), staff, nozzle_int, fuel, opening, closing, litres, price, total,
-                paytm, sbi, hppay, advance, creditor, balance,
-                t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
-            ))
+            INSERT INTO sales(date,staff,nozzle,fuel,opening,closing,litres,price,total,
+            paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,(str(date.today()),staff,nozzle_int,fuel,opening,closing,litres,price,total,
+                 paytm,sbi,hppay,advance,creditor,balance,t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours))
             conn.commit()
-            st.success("Sales Entry Saved Successfully ✅")
+            st.success("Sales Entry Saved ✅")
         except Exception as e:
             st.error(f"Error Saving Entry: {e}")
 
-# ---------------- REPORTS ----------------
-elif page=="Reports":
-    st.title("Reports")
-    df = pd.read_sql("SELECT * FROM sales",conn)
-    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
-        if col not in df.columns: df[col]=0
-    report_type = st.selectbox("Report Type",["Daily","Monthly"])
-    if report_type=="Daily":
-        d = st.date_input("Select Date",date.today())
-        r = df[df["date"]==str(d)]
-        st.dataframe(r)
-        if not r.empty:
-            daily_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(daily_summary.set_index("staff")["Litres"])
-    else:
-        df["month"]=df["date"].str.slice(0,7)
-        months=df["month"].unique()
-        m=st.selectbox("Month",months)
-        r=df[df["month"]==m]
-        st.dataframe(r)
-        if not r.empty:
-            monthly_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(monthly_summary.set_index("staff")["Litres"])
-
-# ---------------- STAFF DAILY CHECKLIST ----------------
-elif page=="Staff Daily Checklist":
-    st.title("Staff Daily Checklist")
-    staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
-    if not staff_list: st.warning("No staff available"); st.stop()
-    staff = st.selectbox("Select Staff",staff_list)
-    checklist_items=[
-        "Report on time in clean uniform with ID badge","Guide vehicles to maintain queue",
-        "Check pump machine condition","Verify area is clean and hazard-free",
-        "Confirm fire extinguisher location","Show ZERO reading before fueling",
-        "Ask customer to switch off engine","Insert nozzle properly and fuel safely",
-        "Stop exactly at requested amount","Avoid fuel spoilage","Collect correct payment",
-        "Issue receipt when required","No mobile phone near pump","No smoking in forecourt",
-        "Report leakage or machine fault","Keep pump area clean","Submit machine reading",
-        "Hand over duty properly","Sales Entry Allowed"
-    ]
-    checks=[st.checkbox(i) for i in checklist_items]
-    if st.button("Apply Checklist"):
-        if all(checks):
-            cursor.execute("INSERT OR REPLACE INTO checklist(date,staff,completed) VALUES(?,?,1)",(str(date.today()),staff))
-            conn.commit()
-            st.success(f"Checklist completed for {staff}. Sales entry enabled.")
-        else: st.error("Checklist incomplete. Sales entry will remain blocked.")
-
-# ---------------- ADMIN PANEL ----------------
+# ---------------- ADMIN PANEL (Edit/Delete) ----------------
 elif page=="Admin Panel":
     st.title("Admin Panel")
 
-    # --- Staff Management ---
-    new_staff=st.text_input("Add Staff")
-    if st.button("Add Staff"):
-        try:
-            cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
-            conn.commit()
-            st.success("Staff Added")
-        except:
-            st.error("Staff Exists")
-    staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
-    if staff_list:
-        remove=st.selectbox("Remove Staff",staff_list)
-        if st.button("Remove Staff"):
-            cursor.execute("DELETE FROM staff WHERE name=?",(remove,))
-            conn.commit()
-            st.success("Staff Removed")
-
-    # --- Fuel Price Control ---
-    st.subheader("Fuel Price Control")
-    for f in fuel_price:
-        new_price=st.number_input(f,value=float(fuel_price[f]))
-        if st.button(f"Update {f}"):
-            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
-            conn.commit()
-            st.success("Price Updated")
-
-    # --- Sales Data Edit/Delete ---
-    st.subheader("Edit / Delete Sales Entry")
-    sales_df = pd.read_sql("SELECT * FROM sales ORDER BY id DESC",conn)
+    # Read sales safely
+    sales_df = read_sales()
     if not sales_df.empty:
         selected_id = st.selectbox("Select Sale ID", sales_df["id"].tolist())
         record = sales_df[sales_df["id"]==selected_id].iloc[0]
 
-        # Editable fields
-        staff_edit = st.selectbox("Staff", pd.read_sql("SELECT name FROM staff",conn)["name"].tolist(), index=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist().index(record["staff"]))
+        staff_edit = st.selectbox("Staff", pd.read_sql("SELECT name FROM staff",conn)["name"].tolist(),
+                                  index=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist().index(record["staff"]))
         fuel_edit = st.selectbox("Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(record["fuel"]))
         nozzle_edit = st.number_input("Nozzle", value=int(record["nozzle"]), min_value=1, max_value=12)
         opening_edit = st.number_input("Opening", value=float(record["opening"]))
@@ -265,10 +186,9 @@ elif page=="Admin Panel":
         if st.button("Update Sale"):
             cursor.execute("""
                 UPDATE sales SET staff=?, fuel=?, nozzle=?, opening=?, closing=?, litres=?, price=?, total=?,
-                paytm=?, sbi=?, hppay=?, advance=?, creditor=?, balance=?
-                WHERE id=?
-            """, (staff_edit, fuel_edit, nozzle_edit, opening_edit, closing_edit, litres_edit, price_edit, total_edit,
-                  paytm_edit, sbi_edit, hppay_edit, advance_edit, creditor_edit, balance_edit, selected_id))
+                paytm=?, sbi=?, hppay=?, advance=?, creditor=?, balance=? WHERE id=?
+            """,(staff_edit,fuel_edit,nozzle_edit,opening_edit,closing_edit,litres_edit,price_edit,total_edit,
+                 paytm_edit,sbi_edit,hppay_edit,advance_edit,creditor_edit,balance_edit,selected_id))
             conn.commit()
             st.success("Sale Updated ✅")
 
@@ -276,5 +196,3 @@ elif page=="Admin Panel":
             cursor.execute("DELETE FROM sales WHERE id=?",(selected_id,))
             conn.commit()
             st.success("Sale Deleted ✅")
-
-
