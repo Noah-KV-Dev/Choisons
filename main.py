@@ -3,12 +3,13 @@ import pandas as pd
 import sqlite3
 from datetime import date, datetime
 
-st.set_page_config(page_title="Petrol Pump Manager", layout="wide")
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
+# Sales Table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,8 +34,13 @@ hours REAL
 )
 """)
 
+# Staff Table
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
+
+# Fuel Price Table
 cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price REAL)")
+
+# Staff Daily Checklist Table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS checklist(
 date TEXT,
@@ -43,31 +49,28 @@ completed INTEGER,
 PRIMARY KEY(date,staff)
 )
 """)
+
 conn.commit()
 
 # ---------------- DEFAULT FUELS ----------------
-fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
-for f,p in fuels.items():
+default_fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
+for f,p in default_fuels.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
 conn.commit()
 fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
 fuel_price = dict(zip(fuel_df["fuel"],fuel_df["price"]))
 
-# ---------------- SESSION ----------------
-if "admin" not in st.session_state:
-    st.session_state.admin=False
-if "check_date" not in st.session_state:
-    st.session_state.check_date=str(date.today())
-if st.session_state.check_date != str(date.today()):
-    st.session_state.check_date=str(date.today())
+# ---------------- SESSION STATE ----------------
+if "admin" not in st.session_state: st.session_state.admin=False
+if "check_date" not in st.session_state: st.session_state.check_date=str(date.today())
+if st.session_state.check_date != str(date.today()): st.session_state.check_date=str(date.today())
 
 # ---------------- SIDEBAR ----------------
 menu=["Sales Entry","Reports","Staff Daily Checklist"]
-if st.session_state.admin:
-    menu.append("Admin Panel")
+if st.session_state.admin: menu.append("Admin Panel")
 page = st.sidebar.selectbox("Menu",menu)
 
-# ---------------- ADMIN LOGIN ----------------
+# Admin login/logout below menu
 st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
@@ -102,10 +105,8 @@ if page=="Sales Entry":
 
     # --- DUTY TIMES ---
     col1,col2 = st.columns(2)
-    with col1:
-        time_in = st.time_input("Duty IN")
-    with col2:
-        time_out = st.time_input("Duty OUT")
+    with col1: time_in = st.time_input("Duty IN")
+    with col2: time_out = st.time_input("Duty OUT")
     t1 = datetime.combine(date.today(),time_in)
     t2 = datetime.combine(date.today(),time_out)
     hours = round((t2-t1).seconds/3600,2)
@@ -114,14 +115,14 @@ if page=="Sales Entry":
     # --- NOZZLE / OPENING ---
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
     try:
-        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1", (nozzle,))
+        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle,))
         last = cursor.fetchone()
         opening_default = float(last[0]) if last and last[0] is not None else 0.0
     except:
         opening_default = 0.0
     opening = st.number_input("Opening Meter", value=opening_default)
     closing = st.number_input("Closing Meter", 0.0)
-    litres = max(closing - opening, 0)
+    litres = max(closing - opening,0)
 
     # --- FUEL ---
     fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
@@ -156,21 +157,60 @@ if page=="Sales Entry":
         conn.commit()
         st.success("Entry Saved")
 
+    # --- TODAY SUMMARY ---
+    st.markdown("---")
+    st.subheader("Today Staff Summary")
+    df = pd.read_sql("SELECT * FROM sales",conn)
+    today = df[df["date"]==str(date.today())]
+    if len(today)>0:
+        summary = today.groupby("staff").agg(
+            Opening=("opening","sum"),
+            Closing=("closing","sum"),
+            Litres=("litres","sum"),
+            Sales=("total","sum"),
+            Paytm=("paytm","sum"),
+            SBI=("sbi","sum"),
+            HPPay=("hppay","sum"),
+            Advance=("advance","sum"),
+            Creditor=("creditor","sum"),
+            CashBalance=("balance","sum"),
+            Hours=("hours","sum")
+        ).reset_index()
+        summary["Cash Short"] = summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
+        summary["Cash Excess"] = summary["CashBalance"].apply(lambda x: x if x>0 else 0)
+        st.dataframe(summary,use_container_width=True)
+        st.subheader("Staff Litre Graph Today")
+        st.bar_chart(summary.set_index("staff")["Litres"])
+
 # ---------------- REPORTS ----------------
 elif page=="Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
-    report = st.selectbox("Report Type",["Daily","Monthly"])
-    if report=="Daily":
+    report_type = st.selectbox("Report Type",["Daily","Monthly"])
+    if report_type=="Daily":
         d = st.date_input("Select Date",date.today())
         r = df[df["date"]==str(d)]
         st.dataframe(r)
-    elif report=="Monthly":
+        if len(r)>0:
+            daily_summary = r.groupby("staff").agg(
+                Litres=("litres","sum"),
+                Sales=("total","sum"),
+                Hours=("hours","sum")
+            ).reset_index()
+            st.bar_chart(daily_summary.set_index("staff")["Litres"])
+    elif report_type=="Monthly":
         df["month"]=df["date"].str.slice(0,7)
         months = df["month"].unique()
         m = st.selectbox("Month",months)
         r = df[df["month"]==m]
         st.dataframe(r)
+        if len(r)>0:
+            monthly_summary = r.groupby("staff").agg(
+                Litres=("litres","sum"),
+                Sales=("total","sum"),
+                Hours=("hours","sum")
+            ).reset_index()
+            st.bar_chart(monthly_summary.set_index("staff")["Litres"])
 
 # ---------------- STAFF DAILY CHECKLIST ----------------
 elif page=="Staff Daily Checklist":
@@ -180,7 +220,7 @@ elif page=="Staff Daily Checklist":
         st.warning("No staff available")
         st.stop()
     staff = st.selectbox("Select Staff",staff_list)
-    checklist = [
+    checklist_items = [
         "Report on time in clean uniform with ID badge",
         "Guide vehicles to maintain queue",
         "Check pump machine condition",
@@ -201,12 +241,11 @@ elif page=="Staff Daily Checklist":
         "Hand over duty properly",
         "Sales Entry Allowed"
     ]
-    checks = [st.checkbox(i) for i in checklist]
+    checks = [st.checkbox(i) for i in checklist_items]
     if st.button("Apply Checklist"):
         if all(checks):
-            cursor.execute("""
-            INSERT OR REPLACE INTO checklist(date,staff,completed) VALUES(?,?,1)
-            """,(str(date.today()),staff))
+            cursor.execute("INSERT OR REPLACE INTO checklist(date,staff,completed) VALUES(?,?,1)",
+                           (str(date.today()),staff))
             conn.commit()
             st.success(f"Checklist completed for {staff}. Sales entry enabled.")
         else:
