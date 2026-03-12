@@ -155,10 +155,16 @@ if menu_option == "Sales Entry":
     ip_address = socket.gethostbyname(socket.gethostname())
 
     if st.button("Save Entry", key="save_sales_btn"):
-        cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+        cursor.execute("""
+        INSERT INTO sales(
+            date, staff, fuel, nozzle, opening, closing, litres, price, total,
+            paytm, hp_pay, cash, advance_paid, balance_cash,
+            duty_in, duty_out, hours, ip_address, credit_sale
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
             str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-            paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
-            ip_address, credit_sale
+            paytm, hp_pay, cash, advance_paid, balance_cash,
+            str(duty_in), str(duty_out), hours, ip_address, credit_sale
         ))
         conn.commit()
         df = load_data()
