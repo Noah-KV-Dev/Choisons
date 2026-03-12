@@ -113,14 +113,20 @@ if page=="Sales Entry":
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-    # --- NOZZLE / OPENING ---
-    nozzle = st.selectbox("Nozzle",list(range(1,13)))
-    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle,))
+  # --- NOZZLE / OPENING ---
+nozzle = st.selectbox("Nozzle", list(range(1,13)))
+
+try:
+    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1", (nozzle,))
     last = cursor.fetchone()
-    opening_default = float(last[0]) if last else 0.0
-    opening = st.number_input("Opening Meter",value=opening_default)
-    closing = st.number_input("Closing Meter",0.0)
-    litres = max(closing-opening,0)
+    opening_default = float(last[0]) if last and last[0] is not None else 0.0
+except Exception as e:
+    opening_default = 0.0  # fallback if table empty or column missing
+
+opening = st.number_input("Opening Meter", value=opening_default)
+closing = st.number_input("Closing Meter", 0.0)
+litres = max(closing - opening, 0)
+
 
     # --- FUEL ---
     fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
