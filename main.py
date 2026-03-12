@@ -48,10 +48,13 @@ ip_address TEXT
 """)
 conn.commit()
 
-# Default fuel prices
+# ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
-for fuel,price in default_prices.items():
-    cursor.execute("INSERT OR IGNORE INTO fuel_prices VALUES (?,?)",(fuel,price))
+for fuel, price in default_prices.items():
+    cursor.execute(
+        "INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)",
+        (fuel, float(price))
+    )
 conn.commit()
 
 # ---------------- PAGE CONFIG ----------------
@@ -88,7 +91,7 @@ df = load_data()
 # ---------------- SIDEBAR MENU ----------------
 menu_option = st.sidebar.selectbox("Menu", ["Sales Entry", "Reports & Summary"])
 
-# ---------------- ADMIN LOGIN (Sidebar) ----------------
+# ---------------- ADMIN LOGIN ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
 
