@@ -147,30 +147,30 @@ if menu_option == "Sales Entry":
     with col2: hp_pay = st.number_input("HP Pay", 0.0)
     with col3: cash = st.number_input("Cash", 0.0)
     advance_paid = st.number_input("Advance Paid", 0.0)
-    credit = st.number_input("Total Credit Amount", min_value=0.0)
 
-    # ---------------- DYNAMIC CREDITORS ----------------
-    st.subheader("Creditors for this Sale (Amount Auto)")
+    # ---------------- MANUAL CREDITORS ----------------
+    st.subheader("Creditors for this Sale (Manual Credit Amount)")
     if "sale_creditors" not in st.session_state or not isinstance(st.session_state.sale_creditors, list):
         st.session_state.sale_creditors = []
 
     selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
     vehicle_number = st.text_input("Vehicle Number (Optional)")
+    credit_amount_input = st.number_input("Credit Amount for this Creditor", min_value=0.0, step=1.0)
 
     if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
-        existing_sum = sum([c.get("amount", 0) for c in st.session_state.sale_creditors])
-        remaining = max(credit - existing_sum, 0)
-        if remaining > 0:
+        if credit_amount_input > 0:
             st.session_state.sale_creditors.append({
                 "creditor_name": selected_creditor,
                 "vehicle_number": vehicle_number.strip(),
-                "amount": remaining
+                "amount": credit_amount_input
             })
 
+    # Auto-calculate total credit for this sale
     auto_total_credit = sum([c.get("amount", 0) for c in st.session_state.sale_creditors]) if st.session_state.sale_creditors else 0
     if st.session_state.sale_creditors:
         st.table(pd.DataFrame(st.session_state.sale_creditors))
-    st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
+
+    st.info(f"Total Credit for this Sale (auto): ₹ {auto_total_credit}")
     balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
     st.info(f"Updated Balance Cash: ₹ {balance_cash}")
 
