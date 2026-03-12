@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
-st.set_page_config(page_title="Petrol Pump System", layout="wide")
+st.set_page_config(page_title="HP Petrol Pump System", layout="wide")
 
 # ---------------- DATABASE ----------------
 
@@ -24,7 +24,10 @@ paytm REAL,
 sbi REAL,
 hppay REAL,
 advance REAL,
-balance REAL
+creditor REAL,
+balance REAL,
+time_in TEXT,
+time_out TEXT
 )
 """)
 
@@ -33,71 +36,72 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE,price REA
 
 conn.commit()
 
-# ---------------- DEFAULT DATA ----------------
+# ---------------- DEFAULT FUELS ----------------
 
-cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES('Petrol',100)")
-cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES('Diesel',90)")
+fuels = {
+"Petrol":100,
+"Diesel":90,
+"Power Petrol":105,
+"Oil":120
+}
+
+for f,p in fuels.items():
+    cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
+
 conn.commit()
 
 fuel_df = pd.read_sql("SELECT * FROM fuel_price", conn)
 fuel_price = dict(zip(fuel_df["fuel"], fuel_df["price"]))
 
-# ---------------- SESSION STATES ----------------
+# ---------------- SESSION ----------------
 
 if "admin" not in st.session_state:
     st.session_state.admin = False
 
-if "checklist_applied" not in st.session_state:
-    st.session_state.checklist_applied = False
+if "checklist_done" not in st.session_state:
+    st.session_state.checklist_done = False
 
 if "checklist_date" not in st.session_state:
     st.session_state.checklist_date = str(date.today())
 
-# reset checklist daily
 if st.session_state.checklist_date != str(date.today()):
-    st.session_state.checklist_applied = False
+    st.session_state.checklist_done = False
     st.session_state.checklist_date = str(date.today())
-
-# ---------------- CHECKLIST ITEMS ----------------
-
-checklist_items = [
-
-"Report on time in clean uniform with ID badge",
-"Guide vehicles to maintain smooth queue",
-"Check assigned pump machine condition",
-"Verify area is clean and hazard-free",
-"Confirm fire extinguisher location",
-"Greet customer politely and confirm fuel type",
-"Show ZERO reading before fueling",
-"Ask customer to switch off engine",
-"Insert nozzle properly and fuel safely",
-"Stop exactly at requested amount",
-"Avoid fuel spoillage or overfilling",
-"Return nozzle and close cap if needed",
-"Collect correct payment",
-"Count cash in front of customer",
-"Issue receipt when required",
-"Inform cashier/manager for any issue",
-"Thank customer before they leave",
-"No smoking or mobile use near pumps",
-"Report leakage or machine fault immediately",
-"Do not argue with customers call manager",
-"Follow all safety procedures of Hindustan Petroleum",
-"Keep pump area clean",
-"Report machine reading to manager",
-"Submit pending receipts or issues",
-"Hand over duty properly to next staff"
-
-]
 
 # ---------------- SIDEBAR MENU ----------------
 
-menu = ["Sales Entry", "Reports", "Staff Daily Checklist"]
+menu = ["Sales Entry","Reports","Staff Daily Checklist"]
 
 if st.session_state.admin:
     menu.append("Admin Controls")
 
 page = st.sidebar.selectbox("Menu", menu)
+
+# ---------------- ADMIN LOGIN ----------------
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Admin Access")
+
+if not st.session_state.admin:
+
+    password = st.sidebar.text_input("Admin Password", type="password")
+
+    if st.sidebar.button("Login"):
+
+        if password == "admin786":
+            st.session_state.admin = True
+            st.sidebar.success("Admin Logged In")
+            st.rerun()
+        else:
+            st.sidebar.error("Wrong Password")
+
+else:
+
+    st.sidebar.success("Admin Logged In")
+
+    if st.sidebar.button("Logout"):
+        st.session_state.admin = False
+        st.rerun()
 
 # ---------------- SALES ENTRY ----------------
 
@@ -105,17 +109,25 @@ if page == "Sales Entry":
 
     st.title("Fuel Sales Entry")
 
-    if not st.session_state.checklist_applied:
-        st.error("Sales Blocked: Complete Staff Daily Checklist First")
+    if not st.session_state.checklist_done:
+        st.error("Sales Blocked — Complete Staff Daily Checklist")
         st.stop()
 
     staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 
     if len(staff_list) == 0:
-        st.warning("No staff added. Admin must add staff first.")
+        st.warning("No staff available. Admin must add staff.")
         st.stop()
 
     staff = st.selectbox("Staff", staff_list)
+
+    col1,col2 = st.columns(2)
+
+    with col1:
+        time_in = st.time_input("Duty Time IN", datetime.now().time())
+
+    with col2:
+        time_out = st.time_input("Duty Time OUT", datetime.now().time())
 
     fuel = st.selectbox("Fuel Type", list(fuel_price.keys()))
 
@@ -123,63 +135,105 @@ if page == "Sales Entry":
 
     st.info(f"Fuel Price ₹ {price}")
 
-    opening = st.number_input("Opening Meter", 0.0)
+    opening = st.number_input("Opening Meter",0.0)
+    closing = st.number_input("Closing Meter",0.0)
 
-    closing = st.number_input("Closing Meter", 0.0)
-
-    litres = max(closing - opening, 0)
-
-    total = litres * price
+    litres = max(closing-opening,0)
+    total = litres*price
 
     st.success(f"Litres = {litres} | Amount = ₹ {total}")
 
     st.subheader("Payments")
 
-    paytm = st.number_input("Paytm", 0.0)
-    sbi = st.number_input("SBI", 0.0)
-    hppay = st.number_input("HP Pay", 0.0)
-    advance = st.number_input("Advance Paid", 0.0)
+    paytm = st.number_input("Paytm",0.0)
+    sbi = st.number_input("SBI",0.0)
+    hppay = st.number_input("HP Pay",0.0)
+    advance = st.number_input("Advance Paid",0.0)
+    creditor = st.number_input("Creditor",0.0)
 
-    paid = paytm + sbi + hppay + advance
-
-    balance = total - paid
+    paid = paytm+sbi+hppay+advance+creditor
+    balance = total-paid
 
     st.warning(f"Balance Cash ₹ {balance}")
 
     if st.button("Save Entry"):
 
         cursor.execute("""
-        INSERT INTO sales VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-        str(date.today()), staff, fuel, opening, closing, litres,
-        price, total, paytm, sbi, hppay, advance, balance
+        INSERT INTO sales VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,(
+        str(date.today()),staff,fuel,opening,closing,litres,price,total,
+        paytm,sbi,hppay,advance,creditor,balance,
+        str(time_in),str(time_out)
         ))
 
         conn.commit()
 
-        st.success("Sales Entry Saved")
+        st.success("Entry Saved")
+
+    # -------- QUICK REPORT --------
+
+    st.markdown("---")
+    st.subheader("Quick Daily Summary")
+
+    df = pd.read_sql("SELECT * FROM sales", conn)
+
+    today = df[df["date"] == str(date.today())]
+
+    if len(today) > 0:
+
+        c1,c2,c3,c4 = st.columns(4)
+
+        c1.metric("Total Sales", round(today["total"].sum(),2))
+        c2.metric("Total Litres", round(today["litres"].sum(),2))
+        c3.metric("Total Paytm", round(today["paytm"].sum(),2))
+        c4.metric("Total Balance Cash", round(today["balance"].sum(),2))
 
 # ---------------- REPORTS ----------------
 
 elif page == "Reports":
 
-    st.title("Daily Sales Report")
+    st.title("Reports")
+
+    report_type = st.selectbox("Select Report",[
+    "Daily Sales",
+    "Staff Sales",
+    "Fuel Sales",
+    "Payment Summary"
+    ])
 
     df = pd.read_sql("SELECT * FROM sales", conn)
 
-    if len(df) > 0:
+    if len(df) == 0:
+        st.warning("No data available")
+        st.stop()
 
-        selected_date = st.date_input("Select Date", date.today())
+    if report_type == "Daily Sales":
 
-        report = df[df["date"] == str(selected_date)]
+        d = st.date_input("Date",date.today())
 
-        if len(report) > 0:
+        r = df[df["date"] == str(d)].sort_values("staff")
 
-            report = report.sort_values("staff")
+        st.dataframe(r)
 
-            st.dataframe(report)
+        st.write("Total ₹", r["total"].sum())
 
-            st.write("Total Sales ₹", report["total"].sum())
+    elif report_type == "Staff Sales":
+
+        r = df.groupby("staff")[["litres","total"]].sum()
+
+        st.dataframe(r)
+
+    elif report_type == "Fuel Sales":
+
+        r = df.groupby("fuel")[["litres","total"]].sum()
+
+        st.dataframe(r)
+
+    elif report_type == "Payment Summary":
+
+        payments = df[["paytm","sbi","hppay","advance","creditor","balance"]].sum()
+
+        st.write(payments)
 
 # ---------------- CHECKLIST ----------------
 
@@ -187,18 +241,32 @@ elif page == "Staff Daily Checklist":
 
     st.title("Staff Daily Checklist")
 
-    checks = []
+    checklist = [
 
-    for item in checklist_items:
-        checks.append(st.checkbox(item))
+    "Report on time in uniform",
+    "Check pump machine condition",
+    "Confirm fire extinguisher",
+    "Show ZERO reading before fueling",
+    "Customer engine OFF confirmed",
+    "Fuel safely without spill",
+    "Collect correct payment",
+    "No mobile near pumps",
+    "Report leakage immediately",
+    "Keep pump area clean",
+    "Submit machine reading to manager",
+    "Hand over duty properly"
+
+    ]
+
+    checks = [st.checkbox(i) for i in checklist]
 
     if st.button("Apply Checklist"):
 
         if all(checks):
-            st.session_state.checklist_applied = True
-            st.success("Checklist Completed. Sales Enabled.")
+            st.session_state.checklist_done = True
+            st.success("Checklist Completed — Sales Enabled")
         else:
-            st.error("Checklist incomplete. Sales still blocked.")
+            st.error("Checklist incomplete")
 
 # ---------------- ADMIN CONTROLS ----------------
 
@@ -213,7 +281,7 @@ elif page == "Admin Controls":
     if st.button("Add Staff"):
 
         try:
-            cursor.execute("INSERT INTO staff VALUES(?)", (new_staff,))
+            cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
             conn.commit()
             st.success("Staff Added")
         except:
@@ -221,52 +289,28 @@ elif page == "Admin Controls":
 
     st.subheader("Remove Staff")
 
-    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+    staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
 
-    if len(staff_list) > 0:
+    if len(staff_list)>0:
 
         remove_staff = st.selectbox("Select Staff", staff_list)
 
         if st.button("Remove Staff"):
+
             cursor.execute("DELETE FROM staff WHERE name=?", (remove_staff,))
             conn.commit()
+
             st.success("Staff Removed")
 
-    st.subheader("Fuel Price Control")
+    st.subheader("Fuel Price Change")
 
-    for fuel in fuel_price:
+    for f in fuel_price:
 
-        new_price = st.number_input(fuel, value=float(fuel_price[fuel]))
+        new_price = st.number_input(f,value=float(fuel_price[f]))
 
-        if st.button(f"Update {fuel}"):
+        if st.button(f"Update {f}"):
 
-            cursor.execute(
-                "UPDATE fuel_price SET price=? WHERE fuel=?",
-                (new_price, fuel)
-            )
-
+            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
             conn.commit()
 
-            st.success(f"{fuel} price updated")
-
-# ---------------- ADMIN LOGIN (BOTTOM SIDEBAR) ----------------
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("Admin Login")
-
-username = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
-
-if st.sidebar.button("Login"):
-
-    if password == "admin786":
-        st.session_state.admin = True
-        st.sidebar.success("Admin Logged In")
-    else:
-        st.sidebar.error("Wrong Password")
-
-if st.session_state.admin:
-
-    if st.sidebar.button("Logout"):
-        st.session_state.admin = False
-        st.rerun()
+            st.success(f"{f} price updated")
