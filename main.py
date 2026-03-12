@@ -4,6 +4,32 @@ import sqlite3
 from datetime import date, datetime
 import socket
 
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
+
+# -------- AUTO TAB SCRIPT --------
+st.markdown("""
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    const inputs = window.parent.document.querySelectorAll('input');
+
+    inputs.forEach((input, index) => {
+        input.addEventListener('change', function() {
+
+            const next = inputs[index + 1];
+
+            if(next){
+                next.focus();
+            }
+
+        });
+    });
+
+});
+</script>
+""", unsafe_allow_html=True)
+
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -60,37 +86,34 @@ conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
-for fuel, price in default_prices.items():
-    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, price))
+
+for fuel,price in default_prices.items():
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel,price) VALUES (?,?)",(fuel,price))
+
 conn.commit()
 
-# ---------------- PAGE ----------------
-st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-
-st.title("⛽ Choisons Petrol Pump Management System")
-
-st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  |  Created by Nazeeh")
-# ---------------- FUNCTIONS ----------------
+# ---------------- LOAD DATA ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
 
     if not df.empty:
-        df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+        df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
 
     return df
-
 
 def export_excel(data):
     return data.to_csv(index=False).encode("utf-8")
 
-
-# ---------------- LOAD DATA ----------------
 df = load_data()
 
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
-fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
+fuel_price_dict = dict(zip(fuel_prices_df["fuel"],fuel_prices_df["price"]))
 
 staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+
+# ---------------- TITLE ----------------
+st.title("⛽ Choisons Petrol Pump Management System")
+st.info("Phone: +91 8590304889")
 
 # ---------------- ADMIN SESSION ----------------
 if "logged_in_admin" not in st.session_state:
@@ -128,8 +151,6 @@ if not st.session_state.logged_in_admin:
 
             st.session_state.logged_in_admin = admin_name
 
-            st.sidebar.success("Admin Logged In")
-
             st.rerun()
 
         else:
@@ -157,7 +178,7 @@ else:
 # ---------------- SALES ENTRY ----------------
 if menu_option == "Sales Entry":
 
-    st.subheader("Sales Entry")
+    st.subheader("Fuel Sales Entry")
 
     col1,col2,col3 = st.columns(3)
 
@@ -186,10 +207,10 @@ if menu_option == "Sales Entry":
 
     total = litres*price
 
-    st.success(f"Litres: {litres} | Total ₹ {total}")
+    st.success(f"Litres Sold: {litres} | Total ₹ {total}")
 
     # -------- PAYMENTS --------
-    st.subheader("Payments")
+    st.subheader("Payment")
 
     col1,col2,col3,col4,col5 = st.columns(5)
 
@@ -203,14 +224,14 @@ if menu_option == "Sales Entry":
         cash = st.number_input("Cash",0.0)
 
     with col4:
-        advance_paid = st.number_input("Advance",0.0)
+        advance_paid = st.number_input("Advance Paid",0.0)
 
     with col5:
         credit_sale = st.number_input("Credit Sale",0.0)
 
     balance_cash = max(total-(paytm+hp_pay+cash+advance_paid+credit_sale),0)
 
-    st.info(f"Balance Cash ₹ {balance_cash}")
+    st.info(f"Balance Cash: ₹ {balance_cash}")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -232,38 +253,9 @@ if menu_option == "Sales Entry":
 
         conn.commit()
 
-        st.success("Saved")
+        st.success("Entry Saved")
 
         st.rerun()
-
-    # -------- CASH SHORTAGE --------
-    st.subheader("Daily Cash Closing")
-
-    system_cash = paytm + hp_pay + cash
-
-    closing_cash = st.number_input("Actual Cash in Hand",0.0)
-
-    shortage = closing_cash-system_cash
-
-    if st.button("Check Cash"):
-
-        cursor.execute("""
-        INSERT INTO cash_closing VALUES (?,?,?,?,?)
-        """,(str(entry_date),system_cash,closing_cash,shortage,ip))
-
-        conn.commit()
-
-        if shortage == 0:
-
-            st.success("Cash Perfect")
-
-        elif shortage < 0:
-
-            st.error(f"Cash Shortage ₹ {shortage}")
-
-        else:
-
-            st.warning(f"Extra Cash ₹ {shortage}")
 
 # ---------------- REPORTS ----------------
 elif menu_option == "Reports & Summary":
@@ -281,29 +273,24 @@ elif menu_option == "Reports & Summary":
     with col3:
         st.metric("Total Hours",df["hours"].sum())
 
-    st.subheader("Fuel Sales Chart")
-
+    st.subheader("Fuel Chart")
     st.bar_chart(df.groupby("fuel")["litres"].sum())
 
     st.subheader("Staff Performance")
-
     st.bar_chart(df.groupby("staff")["total"].sum())
 
     st.subheader("Nozzle Sales")
-
     st.bar_chart(df.groupby("nozzle")["litres"].sum())
-
-    st.subheader("Daily Data")
 
     st.dataframe(df)
 
     csv = export_excel(df)
 
     st.download_button(
-    "Download Full Report",
-    csv,
-    "petrol_sales.csv",
-    "text/csv"
+        "Download Excel Report",
+        csv,
+        "petrol_sales.csv",
+        "text/csv"
     )
 
 # ---------------- ADMIN CONTROLS ----------------
@@ -316,15 +303,11 @@ elif menu_option == "Admin Controls":
     if st.button("Add Staff"):
 
         try:
-
             cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
-
             conn.commit()
-
             st.success("Staff Added")
 
         except:
-
             st.error("Staff Exists")
 
     st.subheader("Update Fuel Prices")
@@ -332,15 +315,15 @@ elif menu_option == "Admin Controls":
     for fuel in ["Petrol","Diesel","Power Petrol"]:
 
         price = st.number_input(
-        fuel,
-        value=float(fuel_price_dict.get(fuel,100))
+            fuel,
+            value=float(fuel_price_dict.get(fuel,100))
         )
 
         if st.button(f"Update {fuel}"):
 
             cursor.execute(
-            "UPDATE fuel_prices SET price=? WHERE fuel=?",
-            (price,fuel)
+                "UPDATE fuel_prices SET price=? WHERE fuel=?",
+                (price,fuel)
             )
 
             conn.commit()
