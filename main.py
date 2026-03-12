@@ -151,7 +151,7 @@ if page=="Sales Entry":
 
     st.info(f"Working Hours: {hours}")
 
-    # -------- NOZZLE --------
+    # ---------- NOZZLE ----------
 
     nozzle=st.selectbox("Nozzle",list(range(1,13)))
 
@@ -174,7 +174,7 @@ if page=="Sales Entry":
 
     litres=max(closing-opening,0)
 
-    # -------- FUEL --------
+    # ---------- FUEL ----------
 
     fuel=st.selectbox("Fuel Type",list(fuel_price.keys()))
 
@@ -186,7 +186,7 @@ if page=="Sales Entry":
 
     st.success(f"Litres {litres} | Amount ₹ {total}")
 
-    # -------- PAYMENTS --------
+    # ---------- PAYMENTS ----------
 
     st.subheader("Payments")
 
@@ -221,10 +221,10 @@ if page=="Sales Entry":
 
         st.success("Entry Saved")
 
-    # -------- SUMMARY --------
+    # ---------- TODAY SUMMARY ----------
 
     st.markdown("---")
-    st.subheader("Today Summary")
+    st.subheader("Today Staff Summary")
 
     df=pd.read_sql("SELECT * FROM sales",conn)
 
@@ -232,16 +232,41 @@ if page=="Sales Entry":
 
     if len(today)>0:
 
-        c1,c2,c3,c4=st.columns(4)
+        summary=today.groupby("staff").agg(
+        Litres=("litres","sum"),
+        Sales=("total","sum"),
+        Paytm=("paytm","sum"),
+        SBI=("sbi","sum"),
+        HPPay=("hppay","sum"),
+        Advance=("advance","sum"),
+        Creditor=("creditor","sum"),
+        CashBalance=("balance","sum"),
+        Hours=("hours","sum")
+        ).reset_index()
 
-        c1.metric("Sales ₹",round(today["total"].sum(),2))
-        c2.metric("Litres",round(today["litres"].sum(),2))
-        c3.metric("Staff Hours",round(today["hours"].sum(),2))
-        c4.metric("Balance Cash",round(today["balance"].sum(),2))
+        st.dataframe(summary,use_container_width=True)
+
+        # CASH SHORTAGE
+
+        st.subheader("Daily Cash Short / Extra")
+
+        shortage=summary[summary["CashBalance"]<0]
+        extra=summary[summary["CashBalance"]>0]
+
+        if len(shortage)>0:
+            st.error("Cash Shortage Detected")
+            st.dataframe(shortage)
+
+        if len(extra)>0:
+            st.warning("Extra Cash Detected")
+            st.dataframe(extra)
+
+        if len(shortage)==0 and len(extra)==0:
+            st.success("Cash perfectly matched today")
 
         st.subheader("Staff Wise Litre Graph")
 
-        chart=today.groupby("staff")["litres"].sum()
+        chart=summary.set_index("staff")["Litres"]
 
         st.bar_chart(chart)
 
@@ -307,7 +332,7 @@ elif page=="Staff Daily Checklist":
 
     checklist=[
     "Staff on time",
-    "Proper uniform",
+    "Uniform and ID",
     "Check pump machine",
     "Show zero before fueling",
     "Customer engine off",
