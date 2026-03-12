@@ -71,17 +71,19 @@ st.title("⛽ Choisons Petrol Pump Management System")
 st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  |  Created by Nazeeh")
 
 # ---------------- LOAD DATA ----------------
+def load_data():
+    df = pd.read_sql("SELECT rowid,* FROM sales", conn)
+    for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number","creditor_name"]:
+        if col not in df.columns:
+            df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
+    df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+    return df
+
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
 fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
 staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
-df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-
-# Ensure columns exist
-for col in ["paytm","hp_pay","cash","credit","advance_paid","balance_cash","vehicle_number","creditor_name"]:
-    if col not in df.columns:
-        df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
-df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+df = load_data()
 
 # ---------------- SIDEBAR MENU ----------------
 menu_option = st.sidebar.selectbox("Menu", ["Sales Entry", "Reports & Summary", "Admin Panel"])
@@ -164,8 +166,7 @@ if menu_option == "Sales Entry":
         ))
         conn.commit()
         st.success("Entry Saved")
-        df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-        df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+        df = load_data()
 
     # ---------------- DAILY SUMMARY ----------------
     st.subheader("Daily Summary (Per Staff)")
@@ -219,36 +220,40 @@ elif menu_option == "Reports & Summary":
     st.dataframe(monthly_summary)
 
 # ---------------- ADMIN PANEL ----------------
-if menu_option == "Admin Panel" and st.session_state.logged_in_admin:
-    st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
-    st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
+if menu_option == "Admin Panel":
+    if st.session_state.logged_in_admin:
+        st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
+        st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
 
-    st.subheader("Add Staff")
-    new_staff = st.text_input("Staff Name", key="new_staff")
-    if st.button("Add Staff"):
-        try:
-            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
-            conn.commit()
-            st.success("Staff Added")
-        except:
-            st.error("Staff Exists")
+        # Add Staff
+        st.subheader("Add Staff")
+        new_staff = st.text_input("Staff Name", key="new_staff")
+        if st.button("Add Staff"):
+            try:
+                cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+                conn.commit()
+                st.success("Staff Added")
+            except:
+                st.error("Staff Exists")
 
-    st.subheader("Add Creditor")
-    new_creditor = st.text_input("Creditor Name", key="new_creditor")
-    if st.button("Add Creditor"):
-        try:
-            cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
-            conn.commit()
-            st.success("Creditor Added")
-        except:
-            st.error("Creditor Exists")
+        # Add Creditor
+        st.subheader("Add Creditor")
+        new_creditor = st.text_input("Creditor Name", key="new_creditor")
+        if st.button("Add Creditor"):
+            try:
+                cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
+                conn.commit()
+                st.success("Creditor Added")
+            except:
+                st.error("Creditor Exists")
 
-    st.subheader("Update Fuel Prices")
-    for fuel in ["Petrol","Diesel","Power Petrol"]:
-        new_price = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
-        if st.button(f"Update {fuel}"):
-            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
-            conn.commit()
-            st.success(f"{fuel} price updated")
-elif menu_option == "Admin Panel":
-    st.info("Login as admin to access Admin Panel")
+        # Update Fuel Prices
+        st.subheader("Update Fuel Prices")
+        for fuel in ["Petrol","Diesel","Power Petrol"]:
+            new_price = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
+            if st.button(f"Update {fuel}"):
+                cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+                conn.commit()
+                st.success(f"{fuel} price updated")
+    else:
+        st.info("Login as admin to access Admin Panel")
