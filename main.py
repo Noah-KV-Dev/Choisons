@@ -91,7 +91,7 @@ df = load_data()
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
 if "sale_creditors" not in st.session_state:
-    st.session_state.sale_creditors = []  # For dynamic creditors per sale
+    st.session_state.sale_creditors = []
 
 # ---------------- SIDEBAR MENU ----------------
 menu_options = ["Sales Entry", "Reports & Summary"]
@@ -149,20 +149,18 @@ if menu_option == "Sales Entry":
     with col2: hp_pay = st.number_input("HP Pay", 0.0)
     with col3: cash = st.number_input("Cash", 0.0)
     advance_paid = st.number_input("Advance Paid", 0.0)
-    # total credit input
     credit = st.number_input("Total Credit Amount", min_value=0.0)
 
     # ---------------- DYNAMIC CREDITORS ----------------
     st.subheader("Creditors for this Sale (Amount Auto)")
-    if "sale_creditors" not in st.session_state:
+    if "sale_creditors" not in st.session_state or not isinstance(st.session_state.sale_creditors, list):
         st.session_state.sale_creditors = []
 
     selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
     vehicle_number = st.text_input("Vehicle Number (Optional)")
 
     if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
-        # auto assign amount
-        existing_sum = sum([c["amount"] for c in st.session_state.sale_creditors])
+        existing_sum = sum([c.get("amount", 0) for c in st.session_state.sale_creditors])
         remaining = max(credit - existing_sum, 0)
         if remaining > 0:
             st.session_state.sale_creditors.append({
@@ -171,15 +169,12 @@ if menu_option == "Sales Entry":
                 "amount": remaining
             })
 
+    auto_total_credit = sum([c.get("amount", 0) for c in st.session_state.sale_creditors]) if st.session_state.sale_creditors else 0
     if st.session_state.sale_creditors:
         st.table(pd.DataFrame(st.session_state.sale_creditors))
-        auto_total_credit = sum([c["amount"] for c in st.session_state.sale_creditors])
-        st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
-        balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
-        st.info(f"Updated Balance Cash: ₹ {balance_cash}")
-    else:
-        balance_cash = max(total - (paytm + hp_pay + cash + advance_paid), 0)
-        st.info(f"Balance Cash: ₹ {balance_cash}")
+    st.info(f"Total Credit (auto): ₹ {auto_total_credit}")
+    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
+    st.info(f"Updated Balance Cash: ₹ {balance_cash}")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -190,7 +185,6 @@ if menu_option == "Sales Entry":
 
     if st.button("Save Entry", key="save_sales_btn"):
         if not st.session_state.sale_creditors:
-            # no creditors
             cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
                 str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
                 paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
