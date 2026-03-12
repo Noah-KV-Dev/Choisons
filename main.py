@@ -69,8 +69,7 @@ st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
 st.title("⛽ Choisons Petrol Pump Management System")
 
-st.info("Phone: +91 8590304889 | Email: kvpnaseeh@gmail.com")
-
+st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  |  Created by Nazeeh")
 # ---------------- FUNCTIONS ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
