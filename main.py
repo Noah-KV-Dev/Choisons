@@ -151,7 +151,7 @@ if page=="Sales Entry":
 
     st.info(f"Working Hours: {hours}")
 
-    # ---------- NOZZLE ----------
+    # -------- NOZZLE --------
 
     nozzle=st.selectbox("Nozzle",list(range(1,13)))
 
@@ -174,7 +174,7 @@ if page=="Sales Entry":
 
     litres=max(closing-opening,0)
 
-    # ---------- FUEL ----------
+    # -------- FUEL --------
 
     fuel=st.selectbox("Fuel Type",list(fuel_price.keys()))
 
@@ -186,7 +186,7 @@ if page=="Sales Entry":
 
     st.success(f"Litres {litres} | Amount ₹ {total}")
 
-    # ---------- PAYMENTS ----------
+    # -------- PAYMENTS --------
 
     st.subheader("Payments")
 
@@ -221,7 +221,7 @@ if page=="Sales Entry":
 
         st.success("Entry Saved")
 
-    # ---------- TODAY SUMMARY ----------
+    # -------- TODAY STAFF SUMMARY --------
 
     st.markdown("---")
     st.subheader("Today Staff Summary")
@@ -244,25 +244,10 @@ if page=="Sales Entry":
         Hours=("hours","sum")
         ).reset_index()
 
+        summary["Cash Short"]=summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
+        summary["Cash Excess"]=summary["CashBalance"].apply(lambda x: x if x>0 else 0)
+
         st.dataframe(summary,use_container_width=True)
-
-        # CASH SHORTAGE
-
-        st.subheader("Daily Cash Short / Extra")
-
-        shortage=summary[summary["CashBalance"]<0]
-        extra=summary[summary["CashBalance"]>0]
-
-        if len(shortage)>0:
-            st.error("Cash Shortage Detected")
-            st.dataframe(shortage)
-
-        if len(extra)>0:
-            st.warning("Extra Cash Detected")
-            st.dataframe(extra)
-
-        if len(shortage)==0 and len(extra)==0:
-            st.success("Cash perfectly matched today")
 
         st.subheader("Staff Wise Litre Graph")
 
