@@ -198,7 +198,6 @@ if menu_option == "Sales Entry":
     # Save entry
     if st.button("Save Entry", key="save_sales_btn"):
         if not st.session_state.sale_creditors:
-            # Save as normal sale without credit
             cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
                 str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
                 paytm, hp_pay, cash, credit, advance_paid, balance_cash, "",
