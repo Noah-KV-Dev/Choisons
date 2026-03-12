@@ -42,7 +42,7 @@ menu=["Sales Entry","Reports","Staff Daily Checklist"]
 if st.session_state.admin: menu.append("Admin Panel")
 page = st.sidebar.selectbox("Menu",menu)
 
-# Admin login/logout
+# Admin login/logout below menu
 st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
@@ -86,9 +86,12 @@ if page=="Sales Entry":
 
     # Nozzle and opening
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
-    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(nozzle,))
-    last = cursor.fetchone()
-    opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    try:
+        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(int(nozzle),))
+        last = cursor.fetchone()
+        opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    except:
+        opening_default = 0.0
     opening = st.number_input("Opening Meter", value=opening_default)
     closing = st.number_input("Closing Meter",0.0)
     litres = max(closing-opening,0)
