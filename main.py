@@ -185,7 +185,7 @@ if page == "Sales Entry":
 
     # ---------------- SAVE ENTRY ----------------
 if page == "Sales Entry":
-    st.title("Fuel Sales Entry (Multiple Rows)")
+    st.title("Fuel Sales Entry (Multiple Opening/Closing)")
 
     staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
     if not staff_list:
@@ -211,35 +211,81 @@ if page == "Sales Entry":
     hours = round((t2 - t1).seconds / 3600, 2)
     st.info(f"Working Hours: {hours}")
 
-    # ---------------- Multiple Entries ----------------
-    if "multi_entries" not in st.session_state:
-        st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
+    # Select Nozzle & Fuel (one per batch)
+    col1, col2 = st.columns(2)
+    with col1:
+        nozzle = st.number_input("Nozzle", min_value=1, max_value=12, value=1)
+    with col2:
+        fuel = st.selectbox("Fuel Type", list(fuel_price.keys()))
+    price = float(fuel_price[fuel])
+    st.info(f"Fuel Price ₹ {price}")
 
-    def add_row():
-        st.session_state.multi_entries.append({"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0})
+    # ---------------- Multiple Opening/Closing Entries ----------------
+    if "multi_oc_entries" not in st.session_state:
+        st.session_state.multi_oc_entries = [{"opening": 0.0, "closing": 0.0}]
 
-    for i, entry in enumerate(st.session_state.multi_entries):
-        st.markdown(f"### Entry {i+1}")
+    def add_entry():
+        st.session_state.multi_oc_entries.append({"opening": 0.0, "closing": 0.0})
 
-        # **Nozzle & Fuel in one line**
-        col1, col2 = st.columns(2)
+    st.markdown("### Enter Opening and Closing Readings")
+    total_litres = 0
+    total_amount = 0
+
+    for i, entry in enumerate(st.session_state.multi_oc_entries):
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            entry["nozzle"] = st.number_input(f"Nozzle {i+1}", min_value=1, max_value=12, value=entry["nozzle"], key=f"nozzle_{i}")
-        with col2:
-            entry["fuel"] = st.selectbox(f"Fuel Type {i+1}", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry["fuel"]), key=f"fuel_{i}")
-
-        # **Opening & Closing in one line**
-        col3, col4 = st.columns(2)
-        with col3:
             entry["opening"] = st.number_input(f"Opening {i+1}", value=float(entry["opening"]), step=0.01, format="%.2f", key=f"opening_{i}")
-        with col4:
+        with col2:
             entry["closing"] = st.number_input(f"Closing {i+1}", value=float(entry["closing"]), step=0.01, format="%.2f", key=f"closing_{i}")
-
         litres = round(max(entry["closing"] - entry["opening"], 0), 2)
-        total = round(litres * fuel_price[entry["fuel"]], 2)
-        st.info(f"Litres: {litres} | Total ₹: {total}")
+        total = round(litres * price, 2)
+        with col3:
+            st.text(f"Litres: {litres}")
+        with col4:
+            st.text(f"Total: ₹ {total}")
+        entry["litres"] = litres
+        entry["total"] = total
+        total_litres += litres
+        total_amount += total
 
-    st.button("Add Another Entry", on_click=add_row)
+    st.button("Add Another Entry", on_click=add_entry)
+
+    st.markdown(f"### Grand Total Litres: {total_litres} | Grand Total Amount: ₹ {total_amount}")
+
+    # ---------------- Payments (cumulative) ----------------
+    st.subheader("Payments")
+    paytm = float(st.number_input("Paytm", 0.0, step=0.01))
+    sbi = float(st.number_input("SBI", 0.0, step=0.01))
+    hppay = float(st.number_input("HP Pay", 0.0, step=0.01))
+    advance = float(st.number_input("Advance Paid", 0.0, step=0.01))
+    creditor = float(st.number_input("Creditor", 0.0, step=0.01))
+
+    # ---------------- SAVE ALL ENTRIES ----------------
+    if st.button("Save All Entries"):
+        for entry in st.session_state.multi_oc_entries:
+            opening = entry["opening"]
+            closing = entry["closing"]
+            litres = entry["litres"]
+            total = entry["total"]
+            balance = round(total - (paytm + sbi + hppay + advance + creditor), 2)
+            try:
+                cursor.execute("""
+                    INSERT INTO sales(
+                        date, staff, nozzle, fuel, opening, closing, litres, price, total,
+                        paytm, sbi, hppay, advance, creditor, balance,
+                        time_in, time_out, hours
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    str(date.today()), staff, int(nozzle), fuel, opening, closing, litres, price, total,
+                    paytm, sbi, hppay, advance, creditor, balance,
+                    t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
+                ))
+            except Exception as e:
+                st.error(f"Error Saving Entry: {e}")
+        conn.commit()
+        st.success("All Sales Entries Saved ✅")
+        # Reset for next batch
+        st.session_state.multi_oc_entries = [{"opening": 0.0, "closing": 0.0}]
 
     # ---------------- TODAY SUMMARY ----------------
     st.markdown("---")
