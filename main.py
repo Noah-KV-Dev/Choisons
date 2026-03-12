@@ -28,9 +28,7 @@ duty_in TEXT,
 duty_out TEXT,
 hours REAL,
 ip_address TEXT,
-creditor_name TEXT,
-vehicle_number TEXT,
-credit_amount REAL
+credit_sale REAL
 )
 """)
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
@@ -72,10 +70,10 @@ st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@
 # ---------------- LOAD DATA ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-    for col in ["paytm","hp_pay","cash","advance_paid","balance_cash","vehicle_number","creditor_name","credit_amount"]:
+    for col in ["paytm","hp_pay","cash","advance_paid","balance_cash","credit_sale"]:
         if col not in df.columns:
-            df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
-    df.fillna({"paytm":0,"hp_pay":0,"cash":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":"","credit_amount":0}, inplace=True)
+            df[col] = 0
+    df.fillna(0, inplace=True)
     df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
     return df
 
@@ -88,8 +86,6 @@ df = load_data()
 # ---------------- SESSION STATE ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
-if "sale_creditors" not in st.session_state:
-    st.session_state.sale_creditors = []
 
 # ---------------- SIDEBAR MENU ----------------
 menu_options = ["Sales Entry", "Reports & Summary"]
@@ -142,37 +138,15 @@ if menu_option == "Sales Entry":
 
     # Payment
     st.subheader("Payment Details")
-    col1,col2,col3 = st.columns(3)
+    col1,col2,col3,col4,col5 = st.columns(5)
     with col1: paytm = st.number_input("Paytm", 0.0)
     with col2: hp_pay = st.number_input("HP Pay", 0.0)
     with col3: cash = st.number_input("Cash", 0.0)
-    advance_paid = st.number_input("Advance Paid", 0.0)
+    with col4: advance_paid = st.number_input("Advance Paid", 0.0)
+    with col5: credit_sale = st.number_input("Credit Sale Amount", 0.0)
 
-    # ---------------- MANUAL CREDITORS ----------------
-    st.subheader("Creditors for this Sale (Manual Credit Amount)")
-    if "sale_creditors" not in st.session_state or not isinstance(st.session_state.sale_creditors, list):
-        st.session_state.sale_creditors = []
-
-    selected_creditor = st.selectbox("Select Creditor", ["--None--"] + creditor_list, key="creditor_select")
-    vehicle_number = st.text_input("Vehicle Number (Optional)")
-    credit_amount_input = st.number_input("Credit Amount for this Creditor", min_value=0.0, step=1.0)
-
-    if selected_creditor != "--None--" and st.button("Add Creditor ➕", key="add_creditor_btn"):
-        if credit_amount_input > 0:
-            st.session_state.sale_creditors.append({
-                "creditor_name": selected_creditor,
-                "vehicle_number": vehicle_number.strip(),
-                "amount": credit_amount_input
-            })
-
-    # Auto-calculate total credit for this sale
-    auto_total_credit = sum([c.get("amount", 0) for c in st.session_state.sale_creditors]) if st.session_state.sale_creditors else 0
-    if st.session_state.sale_creditors:
-        st.table(pd.DataFrame(st.session_state.sale_creditors))
-
-    st.info(f"Total Credit for this Sale (auto): ₹ {auto_total_credit}")
-    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + auto_total_credit), 0)
-    st.info(f"Updated Balance Cash: ₹ {balance_cash}")
+    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit_sale), 0)
+    st.info(f"Balance Cash: ₹ {balance_cash}")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
@@ -182,23 +156,13 @@ if menu_option == "Sales Entry":
     ip_address = socket.gethostbyname(socket.gethostname())
 
     if st.button("Save Entry", key="save_sales_btn"):
-        if not st.session_state.sale_creditors:
-            cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
-                str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-                paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
-                ip_address, "", "", 0
-            ))
-        else:
-            for creditor in st.session_state.sale_creditors:
-                cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
-                    str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-                    paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
-                    ip_address, creditor.get("creditor_name",""), creditor.get("vehicle_number",""),
-                    creditor.get("amount",0)
-                ))
+        cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
+            str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
+            paytm, hp_pay, cash, advance_paid, balance_cash, str(duty_in), str(duty_out), hours,
+            ip_address, credit_sale
+        ))
         conn.commit()
         df = load_data()
-        st.session_state.sale_creditors = []
         st.success("Entry Saved Successfully!")
         try: st.experimental_rerun()
         except: pass
@@ -212,29 +176,18 @@ elif menu_option == "Reports & Summary":
     with col3: st.metric("Total Hours", df["hours"].sum())
 
     st.subheader("Payment Summary")
-    st.dataframe(df[["paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount"]].sum().to_frame().T)
+    st.dataframe(df[["paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash"]].sum().to_frame().T)
 
     st.subheader("Staff Summary")
-    staff_summary = df.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount","hours"]].sum().reset_index()
+    staff_summary = df.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"]].sum().reset_index()
     st.dataframe(staff_summary)
 
     st.subheader("Nozzle Sales")
     nozzle_sales = df.groupby(["date","nozzle"])["litres"].sum().reset_index()
     st.dataframe(nozzle_sales)
 
-    st.subheader("Creditors Outstanding (with Vehicle Details)")
-    credit_df = df[df["credit_amount"]>0].copy()
-    if not credit_df.empty:
-        credit_report = credit_df[["date","staff","creditor_name","vehicle_number","credit_amount","balance_cash"]]
-        st.dataframe(credit_report)
-        st.subheader("Vehicle-wise Credit Summary")
-        vehicle_summary = credit_df.groupby("vehicle_number")[["credit_amount","balance_cash"]].sum().reset_index()
-        st.dataframe(vehicle_summary)
-    else:
-        st.info("No credit records found.")
-
     st.subheader("Monthly Summary")
-    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","balance_cash","credit_amount","hours"]].sum().reset_index()
+    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"]].sum().reset_index()
     st.dataframe(monthly_summary)
 
 # ---------------- ADMIN CONTROLS ----------------
