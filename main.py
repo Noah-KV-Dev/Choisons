@@ -31,9 +31,11 @@ ip_address TEXT,
 credit_sale REAL
 )
 """)
+
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS creditors(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS fuel_prices(fuel TEXT UNIQUE,price REAL)")
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS admin_logs(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,218 +45,305 @@ logout_time TEXT,
 ip_address TEXT
 )
 """)
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS cash_closing(
+date TEXT,
+system_cash REAL,
+closing_cash REAL,
+shortage REAL,
+ip_address TEXT
+)
+""")
+
 conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
 for fuel, price in default_prices.items():
-    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, float(price)))
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, price))
 conn.commit()
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------- PAGE ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-st.markdown("""
-<style>
-html,body,[class*="css"]{
-font-family:sans-serif;
-color:black;
-}
-.stApp{
-background-color:#ff6f00;
-}
-</style>
-""", unsafe_allow_html=True)
-st.title("⛽ Choisons Petrol Pump Management System")
-st.info("Phone: +91 8590304889  |  Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  |  Created by Nazeeh")
 
-# ---------------- LOAD DATA ----------------
+st.title("⛽ Choisons Petrol Pump Management System")
+
+st.info("Phone: +91 8590304889 | Email: kvpnaseeh@gmail.com")
+
+# ---------------- FUNCTIONS ----------------
 def load_data():
     df = pd.read_sql("SELECT rowid,* FROM sales", conn)
-    for col in ["paytm","hp_pay","cash","advance_paid","balance_cash","credit_sale"]:
-        if col not in df.columns:
-            df[col] = 0
-    df.fillna(0, inplace=True)
-    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+
+    if not df.empty:
+        df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
+
     return df
+
+
+def export_excel(data):
+    return data.to_csv(index=False).encode("utf-8")
+
+
+# ---------------- LOAD DATA ----------------
+df = load_data()
 
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
 fuel_price_dict = dict(zip(fuel_prices_df['fuel'], fuel_prices_df['price']))
-staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-df = load_data()
 
-# ---------------- SESSION STATE ----------------
+staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+
+# ---------------- ADMIN SESSION ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
 
-# ---------------- SIDEBAR MENU ----------------
-menu_options = ["Sales Entry", "Reports & Summary"]
-if st.session_state.get("logged_in_admin"):
-    menu_options.append("Admin Controls")
-menu_option = st.sidebar.selectbox("Menu", menu_options)
+# ---------------- SIDEBAR ----------------
+menu = ["Sales Entry","Reports & Summary"]
+
+if st.session_state.logged_in_admin:
+    menu.append("Admin Controls")
+
+menu_option = st.sidebar.selectbox("Menu",menu)
 
 # ---------------- ADMIN LOGIN ----------------
-if not st.session_state.get("logged_in_admin"):
+if not st.session_state.logged_in_admin:
+
     st.sidebar.subheader("Admin Login")
-    admin_name = st.sidebar.text_input("Admin Username", key="login_admin_user")
-    admin_password = st.sidebar.text_input("Password", type="password", key="login_admin_pass")
-    if st.sidebar.button("Login as Admin", key="login_admin_btn"):
-        if admin_password == "admin786":
+
+    admin_name = st.sidebar.text_input("Admin Username")
+    admin_pass = st.sidebar.text_input("Password",type="password")
+
+    if st.sidebar.button("Login"):
+
+        if admin_pass == "admin786":
+
             login_time = datetime.now()
-            ip_address = socket.gethostbyname(socket.gethostname())
-            cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
-                           (admin_name, str(login_time), ip_address))
+            ip = socket.gethostbyname(socket.gethostname())
+
+            cursor.execute(
+            "INSERT INTO admin_logs(admin_name,login_time,ip_address) VALUES (?,?,?)",
+            (admin_name,str(login_time),ip)
+            )
+
             conn.commit()
+
             st.session_state.logged_in_admin = admin_name
-            st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
-            st.experimental_rerun()
+
+            st.sidebar.success("Admin Logged In")
+
+            st.rerun()
+
         else:
-            st.sidebar.error("Incorrect Password!")
+
+            st.sidebar.error("Wrong Password")
+
 else:
-    if st.sidebar.button("Logout Admin", key="logout_admin_btn"):
+
+    if st.sidebar.button("Logout"):
+
         logout_time = datetime.now()
-        cursor.execute("UPDATE admin_logs SET logout_time=? WHERE admin_name=? AND logout_time IS NULL",
-                       (str(logout_time), st.session_state.logged_in_admin))
+
+        cursor.execute("""
+        UPDATE admin_logs 
+        SET logout_time=? 
+        WHERE admin_name=? AND logout_time IS NULL
+        """,(str(logout_time),st.session_state.logged_in_admin))
+
         conn.commit()
-        st.sidebar.success(f"Admin {st.session_state.logged_in_admin} logged out at {logout_time.strftime('%H:%M:%S')}")
+
         st.session_state.logged_in_admin = None
-        st.experimental_rerun()
+
+        st.rerun()
 
 # ---------------- SALES ENTRY ----------------
 if menu_option == "Sales Entry":
+
     st.subheader("Sales Entry")
+
     col1,col2,col3 = st.columns(3)
-    with col1: staff = st.selectbox("Staff Name", staff_list)
-    with col2: entry_date = st.date_input("Date", date.today())
-    with col3: fuel = st.selectbox("Fuel Type", ["Petrol","Diesel","Power Petrol"])
+
+    with col1:
+        staff = st.selectbox("Staff",staff_list)
+
+    with col2:
+        entry_date = st.date_input("Date",date.today())
+
+    with col3:
+        fuel = st.selectbox("Fuel",["Petrol","Diesel","Power Petrol"])
+
     price = fuel_price_dict.get(fuel,100)
+
     nozzle = st.selectbox("Nozzle",[f"Nozzle {i}" for i in range(1,11)])
+
     col4,col5 = st.columns(2)
-    with col4: opening = st.number_input("Opening Meter")
-    with col5: closing = st.number_input("Closing Meter")
+
+    with col4:
+        opening = st.number_input("Opening Meter",0.0)
+
+    with col5:
+        closing = st.number_input("Closing Meter",0.0)
+
     litres = max(closing-opening,0)
+
     total = litres*price
-    st.success(f"Litres Sold: {litres} L | Total: ₹ {total}")
 
-    # Payment
-    st.subheader("Payment Details")
+    st.success(f"Litres: {litres} | Total ₹ {total}")
+
+    # -------- PAYMENTS --------
+    st.subheader("Payments")
+
     col1,col2,col3,col4,col5 = st.columns(5)
-    with col1: paytm = st.number_input("Paytm", 0.0)
-    with col2: hp_pay = st.number_input("HP Pay", 0.0)
-    with col3: cash = st.number_input("Cash", 0.0)
-    with col4: advance_paid = st.number_input("Advance Paid", 0.0)
-    with col5: credit_sale = st.number_input("Credit Sale Amount", 0.0)
 
-    balance_cash = max(total - (paytm + hp_pay + cash + advance_paid + credit_sale), 0)
-    st.info(f"Balance Cash: ₹ {balance_cash}")
+    with col1:
+        paytm = st.number_input("Paytm",0.0)
+
+    with col2:
+        hp_pay = st.number_input("HP Pay",0.0)
+
+    with col3:
+        cash = st.number_input("Cash",0.0)
+
+    with col4:
+        advance_paid = st.number_input("Advance",0.0)
+
+    with col5:
+        credit_sale = st.number_input("Credit Sale",0.0)
+
+    balance_cash = max(total-(paytm+hp_pay+cash+advance_paid+credit_sale),0)
+
+    st.info(f"Balance Cash ₹ {balance_cash}")
 
     duty_in = st.time_input("Duty IN")
     duty_out = st.time_input("Duty OUT")
-    in_time = datetime.combine(date.today(), duty_in)
-    out_time = datetime.combine(date.today(), duty_out)
+
+    in_time = datetime.combine(date.today(),duty_in)
+    out_time = datetime.combine(date.today(),duty_out)
+
     hours = max((out_time-in_time).total_seconds()/3600,0)
-    ip_address = socket.gethostbyname(socket.gethostname())
 
-    if st.button("Save Entry", key="save_sales_btn"):
+    ip = socket.gethostbyname(socket.gethostname())
+
+    if st.button("Save Entry"):
+
         cursor.execute("""
-        INSERT INTO sales(
-            date, staff, fuel, nozzle, opening, closing, litres, price, total,
-            paytm, hp_pay, cash, advance_paid, balance_cash,
-            duty_in, duty_out, hours, ip_address, credit_sale
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (
-            str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
-            paytm, hp_pay, cash, advance_paid, balance_cash,
-            str(duty_in), str(duty_out), hours, ip_address, credit_sale
-        ))
+        INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,(str(entry_date),staff,fuel,nozzle,opening,closing,litres,price,total,
+             paytm,hp_pay,cash,advance_paid,balance_cash,
+             str(duty_in),str(duty_out),hours,ip,credit_sale))
+
         conn.commit()
-        df = load_data()
-        st.success("Entry Saved Successfully!")
-        try: st.experimental_rerun()
-        except: pass
 
-    # ---------------- DAILY REPORT ----------------
-    st.subheader("Daily Sales Report")
-    daily_data = df[df["date"]==str(entry_date)]
-    if not daily_data.empty:
-        st.markdown("<small>", unsafe_allow_html=True)
-        st.dataframe(daily_data[[
-            "date","staff","fuel","nozzle","litres","total","paytm","hp_pay","cash",
-            "advance_paid","credit_sale","balance_cash","duty_in","duty_out","hours"
-        ]])
-        st.markdown("</small>", unsafe_allow_html=True)
-        st.metric("Daily Litres", daily_data["litres"].sum())
-        st.metric("Daily Total Sales", daily_data["total"].sum())
-        st.metric("Daily Credit Sale", daily_data["credit_sale"].sum())
-    else:
-        st.info("No sales for selected day.")
+        st.success("Saved")
 
-    # ---------------- MONTHLY STAFF REPORT ----------------
-    st.subheader("Monthly Staff Report")
-    month_selected = entry_date.strftime("%Y-%m")
-    monthly_data = df[df["date"].str.startswith(month_selected)]
-    if not monthly_data.empty:
-        monthly_staff_report = monthly_data.sort_values(["staff","date"]).reset_index(drop=True)
-        st.markdown("<small>", unsafe_allow_html=True)
-        st.dataframe(monthly_staff_report[[
-            "date","staff","fuel","nozzle","opening","closing","litres","price","total",
-            "paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","duty_in",
-            "duty_out","hours"
-        ]])
-        st.markdown("</small>", unsafe_allow_html=True)
-        staff_summary = monthly_staff_report.groupby("staff")[[
-            "litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"
-        ]].sum().reset_index()
-        st.subheader("Monthly Summary Per Staff")
-        st.dataframe(staff_summary)
-    else:
-        st.info("No sales for the selected month.")
+        st.rerun()
 
-# ---------------- REPORTS & SUMMARY ----------------
+    # -------- CASH SHORTAGE --------
+    st.subheader("Daily Cash Closing")
+
+    system_cash = paytm + hp_pay + cash
+
+    closing_cash = st.number_input("Actual Cash in Hand",0.0)
+
+    shortage = closing_cash-system_cash
+
+    if st.button("Check Cash"):
+
+        cursor.execute("""
+        INSERT INTO cash_closing VALUES (?,?,?,?,?)
+        """,(str(entry_date),system_cash,closing_cash,shortage,ip))
+
+        conn.commit()
+
+        if shortage == 0:
+
+            st.success("Cash Perfect")
+
+        elif shortage < 0:
+
+            st.error(f"Cash Shortage ₹ {shortage}")
+
+        else:
+
+            st.warning(f"Extra Cash ₹ {shortage}")
+
+# ---------------- REPORTS ----------------
 elif menu_option == "Reports & Summary":
-    st.subheader("Dashboard Summary")
+
+    st.subheader("Dashboard")
+
     col1,col2,col3 = st.columns(3)
-    with col1: st.metric("Total Litres", df["litres"].sum())
-    with col2: st.metric("Total Sales ₹", df["total"].sum())
-    with col3: st.metric("Total Hours", df["hours"].sum())
 
-    st.subheader("Payment Summary")
-    st.dataframe(df[["paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash"]].sum().to_frame().T)
+    with col1:
+        st.metric("Total Litres",df["litres"].sum())
 
-    st.subheader("Staff Summary")
-    staff_summary = df.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"]].sum().reset_index()
-    st.dataframe(staff_summary)
+    with col2:
+        st.metric("Total Sales ₹",df["total"].sum())
+
+    with col3:
+        st.metric("Total Hours",df["hours"].sum())
+
+    st.subheader("Fuel Sales Chart")
+
+    st.bar_chart(df.groupby("fuel")["litres"].sum())
+
+    st.subheader("Staff Performance")
+
+    st.bar_chart(df.groupby("staff")["total"].sum())
 
     st.subheader("Nozzle Sales")
-    nozzle_sales = df.groupby(["date","nozzle"])["litres"].sum().reset_index()
-    st.dataframe(nozzle_sales)
 
-    st.subheader("Monthly Summary")
-    monthly_summary = df.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","advance_paid","credit_sale","balance_cash","hours"]].sum().reset_index()
-    st.dataframe(monthly_summary)
+    st.bar_chart(df.groupby("nozzle")["litres"].sum())
+
+    st.subheader("Daily Data")
+
+    st.dataframe(df)
+
+    csv = export_excel(df)
+
+    st.download_button(
+    "Download Full Report",
+    csv,
+    "petrol_sales.csv",
+    "text/csv"
+    )
 
 # ---------------- ADMIN CONTROLS ----------------
-if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
-    st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
-    st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
-    new_staff_admin = st.text_input("Staff Name", key="admin_new_staff")
-    if st.button("Add Staff", key="admin_add_staff_btn"):
+elif menu_option == "Admin Controls":
+
+    st.subheader("Admin Controls")
+
+    new_staff = st.text_input("Add Staff")
+
+    if st.button("Add Staff"):
+
         try:
-            cursor.execute("INSERT INTO staff(name) VALUES (?)", (new_staff_admin,))
+
+            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+
             conn.commit()
+
             st.success("Staff Added")
+
         except:
+
             st.error("Staff Exists")
-    new_creditor_admin = st.text_input("Creditor Name", key="admin_new_creditor")
-    if st.button("Add Creditor", key="admin_add_creditor_btn"):
-        try:
-            cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor_admin,))
-            conn.commit()
-            st.success("Creditor Added")
-        except:
-            st.error("Creditor Exists")
+
+    st.subheader("Update Fuel Prices")
+
     for fuel in ["Petrol","Diesel","Power Petrol"]:
-        new_price_admin = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"admin_price_{fuel}")
-        if st.button(f"Update {fuel}", key=f"admin_update_{fuel}_btn"):
-            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?", (new_price_admin, fuel))
+
+        price = st.number_input(
+        fuel,
+        value=float(fuel_price_dict.get(fuel,100))
+        )
+
+        if st.button(f"Update {fuel}"):
+
+            cursor.execute(
+            "UPDATE fuel_prices SET price=? WHERE fuel=?",
+            (price,fuel)
+            )
+
             conn.commit()
+
             st.success(f"{fuel} price updated")
