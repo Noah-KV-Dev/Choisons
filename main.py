@@ -5,27 +5,12 @@ from datetime import date, datetime, time
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-# ---------------- TITLE & CONTACT ----------------
-st.title("⛽ Choisons Petrol Pump Management System")
-st.info("""
-*Contact Details*  
-
-Phone: +91 8590304889  
-Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  
-
-Created by Nazeeh
-""")
-
-import streamlit as st
-import pandas as pd
-import sqlite3
-from datetime import date, datetime, time
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Create tables if not exist
+# Create tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,7 +85,7 @@ if page=="Sales Entry":
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-    # Nozzle selection and opening meter
+    # Nozzle and opening meter
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
     try:
         nozzle_int = int(nozzle)
@@ -136,22 +121,40 @@ if page=="Sales Entry":
     balance = round(total-(paytm+sbi+hppay+advance+creditor),2)
     st.warning(f"Balance Cash ₹ {balance}")
 
-    # Save entry
+    # ---------------- SAVE ENTRY ----------------
     if st.button("Save Entry"):
+        # Ensure all numeric values are floats
+        opening = float(opening)
+        closing = float(closing)
+        litres = float(litres)
+        price = float(price)
+        total = float(total)
+        paytm = float(paytm)
+        sbi = float(sbi)
+        hppay = float(hppay)
+        advance = float(advance)
+        creditor = float(creditor)
+        balance = float(balance)
+        hours = float(hours)
+
+        # Ensure time strings
+        time_in_str = t1.strftime("%H:%M")
+        time_out_str = t2.strftime("%H:%M")
+
         cursor.execute("""
-        INSERT INTO sales(
-        date,staff,nozzle,fuel,opening,closing,litres,price,total,
-        paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """,(
-        str(date.today()),staff,nozzle_int,fuel,opening,closing,
-        litres,price,total,paytm,sbi,hppay,advance,creditor,balance,
-        t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours
+            INSERT INTO sales(
+            date,staff,nozzle,fuel,opening,closing,litres,price,total,
+            paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            str(date.today()), staff, nozzle_int, fuel, opening, closing,
+            litres, price, total, paytm, sbi, hppay, advance, creditor,
+            balance, time_in_str, time_out_str, hours
         ))
         conn.commit()
         st.success("Entry Saved")
 
-    # Today's summary
+    # ---------------- TODAY SUMMARY ----------------
     st.markdown("---")
     st.subheader("Today Staff Summary")
     df = pd.read_sql("SELECT * FROM sales",conn)
