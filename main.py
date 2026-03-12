@@ -169,9 +169,12 @@ if menu_option == "Sales Entry":
             str(duty_in), str(duty_out), hours, ip_address, vehicle_number
         ))
         conn.commit()
-        st.success("Entry Saved")
         df = load_data()
-        st.experimental_rerun()
+        st.success("Entry Saved Successfully!")
+        try:
+            st.experimental_rerun()
+        except:
+            pass  # ignore rerun exception
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
