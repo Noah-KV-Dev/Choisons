@@ -258,19 +258,6 @@ elif page=="Admin Panel":
             cursor.execute("DELETE FROM staff WHERE name=?",(remove_staff,))
             conn.commit()
             st.success(f"Staff '{remove_staff}' Removed ✅")
-        
-        edit_staff = st.selectbox("Edit Staff Name", staff_list, key="edit_staff_select")
-        new_name = st.text_input("New Name", key="new_staff_name")
-        if st.button("Update Staff Name"):
-            if new_name.strip() != "":
-                try:
-                    cursor.execute("UPDATE staff SET name=? WHERE name=?",(new_name.strip(), edit_staff))
-                    conn.commit()
-                    st.success(f"Staff '{edit_staff}' Updated to '{new_name}' ✅")
-                except sqlite3.IntegrityError:
-                    st.error("This staff name already exists ❌")
-            else:
-                st.warning("Enter a valid new name")
 
     # ---------- FUEL PRICE CONTROL ----------
     st.subheader("Fuel Price Control")
@@ -298,7 +285,12 @@ elif page=="Admin Panel":
 
     # ---------- SALES ENTRY MANAGEMENT ----------
     st.subheader("Manage Sales Entries")
-    df_sales = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
+    try:
+        df_sales = pd.read_sql("SELECT * FROM sales ORDER BY id DESC", conn)
+    except Exception as e:
+        st.error(f"Error loading sales table: {e}")
+        df_sales = pd.DataFrame()  # prevent crash if table is empty or missing
+
     if not df_sales.empty:
         # Select entry to edit/delete
         selected_id = st.selectbox("Select Sales Entry ID to Edit/Delete", df_sales["id"].tolist())
@@ -310,8 +302,8 @@ elif page=="Admin Panel":
         # Editable fields
         col1, col2 = st.columns(2)
         with col1:
-            staff_edit = st.selectbox("Staff", staff_list, index=staff_list.index(entry["staff"]))
-            fuel_edit = st.selectbox("Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry["fuel"]))
+            staff_edit = st.selectbox("Staff", staff_list, index=staff_list.index(entry["staff"]) if entry["staff"] in staff_list else 0)
+            fuel_edit = st.selectbox("Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry["fuel"]) if entry["fuel"] in fuel_price else 0)
             nozzle_edit = st.number_input("Nozzle", min_value=1, max_value=12, value=int(entry["nozzle"]))
             opening_edit = st.number_input("Opening Meter", value=float(entry["opening"]), step=0.01, format="%.2f")
             closing_edit = st.number_input("Closing Meter", value=float(entry["closing"]), step=0.01, format="%.2f")
@@ -350,9 +342,4 @@ elif page=="Admin Panel":
             st.success("Sales Entry Deleted ✅")
     else:
         st.info("No sales entries available to manage.")
-
-        with col4:
-            if st.button(f"Remove Fuel {row['fuel']}", key=f"remove_fuel_{index}"):
-                cursor.execute("DELETE FROM fuel_price WHERE fuel=?",(row["fuel"],))
-                conn.commit()
-                st.success(f"Fuel '{row['fuel']}' Removed ✅")
+['fuel']}' Removed ✅")
