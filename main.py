@@ -50,16 +50,6 @@ credit REAL
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT UNIQUE)")
 cursor.execute("CREATE TABLE IF NOT EXISTS fuel_prices(fuel TEXT UNIQUE,price REAL)")
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS cash_closing(
-date TEXT,
-system_cash REAL,
-closing_cash REAL,
-shortage REAL,
-ip_address TEXT
-)
-""")
-
 conn.commit()
 
 # ---------------- DEFAULT FUEL PRICES ----------------
@@ -96,18 +86,25 @@ if "admin" not in st.session_state:
 
 st.sidebar.subheader("Admin Login")
 
-user = st.sidebar.text_input("Username")
-password = st.sidebar.text_input("Password", type="password")
+admin_user = st.sidebar.text_input("Username")
+admin_pass = st.sidebar.text_input("Password", type="password")
 
 if st.sidebar.button("Login"):
-    if password == "admin786":
+    if admin_pass == "admin786":
         st.session_state.admin = True
         st.sidebar.success("Admin Logged In")
     else:
         st.sidebar.error("Wrong Password")
 
+# ADMIN LOGOUT
+if st.session_state.admin:
+    if st.sidebar.button("Logout Admin"):
+        st.session_state.admin = False
+        st.sidebar.success("Admin Logged Out")
+        st.rerun()
+
 # ---------------- MENU ----------------
-menu = ["Sales Entry","Reports"]
+menu = ["Sales Entry","Reports","HP Daily Staff Check List"]
 
 if st.session_state.admin:
     menu.append("Admin Controls")
@@ -143,10 +140,9 @@ if page == "Sales Entry":
         closing = st.number_input("Closing Meter",0.0)
 
     litres = max(closing-opening,0)
-
     total = litres*price
 
-    st.success(f"Litres: {litres}  |  Amount ₹ {total}")
+    st.success(f"Litres: {litres} | Amount ₹ {total}")
 
     st.subheader("Payments")
 
@@ -197,25 +193,71 @@ elif page == "Reports":
     with col2: st.metric("Total Sales ₹", df["total"].sum())
     with col3: st.metric("Total Hours", df["hours"].sum())
 
-    st.subheader("Fuel Sales Chart")
+    st.subheader("Daily Sales Report")
+
+    report_date = st.date_input("Select Date", date.today())
+
+    daily_df = df[df["date"] == str(report_date)]
+
+    if not daily_df.empty:
+
+        daily_df = daily_df.sort_values("staff")
+
+        st.dataframe(daily_df)
+
+        st.write("### Totals")
+
+        st.write("Total Litres:", daily_df["litres"].sum())
+        st.write("Total Sales:", daily_df["total"].sum())
+        st.write("Total Cash:", daily_df["cash"].sum())
+
+        csv = export_excel(daily_df)
+
+        st.download_button(
+            "Download Daily Report",
+            csv,
+            "daily_sales.csv",
+            "text/csv"
+        )
+
+    else:
+        st.info("No sales found")
+
+    st.subheader("Fuel Chart")
     st.bar_chart(df.groupby("fuel")["litres"].sum())
 
     st.subheader("Staff Performance")
     st.bar_chart(df.groupby("staff")["total"].sum())
 
-    st.subheader("Nozzle Sales")
-    st.bar_chart(df.groupby("nozzle")["litres"].sum())
+# ---------------- HP DAILY STAFF CHECKLIST ----------------
+elif page == "HP Daily Staff Check List":
 
-    st.dataframe(df)
+    st.header("HP Daily Staff Check List")
 
-    csv = export_excel(df)
+    st.subheader("1️⃣ Staff Discipline")
+    st.checkbox("Staff on time")
+    st.checkbox("Proper uniform & ID card")
+    st.checkbox("No mobile phone during duty")
 
-    st.download_button(
-        "Download Excel Report",
-        csv,
-        "petrol_sales.csv",
-        "text/csv"
-    )
+    st.subheader("2️⃣ Nozzle & Fuel")
+    st.checkbox("Opening meter reading checked")
+    st.checkbox("No leakage in nozzle")
+    st.checkbox("Correct fuel delivery")
+
+    st.subheader("3️⃣ Cash Control")
+    st.checkbox("Opening cash verified")
+    st.checkbox("Cash matches system sales")
+    st.checkbox("UPI / Card machine working")
+
+    st.subheader("4️⃣ Safety")
+    st.checkbox("Fire extinguisher available")
+    st.checkbox("No smoking in forecourt")
+    st.checkbox("Emergency switch working")
+
+    st.subheader("5️⃣ Closing Check")
+    st.checkbox("Closing nozzle reading recorded")
+    st.checkbox("Cash balance checked")
+    st.checkbox("Daily report completed")
 
 # ---------------- ADMIN CONTROLS ----------------
 elif page == "Admin Controls":
@@ -223,6 +265,7 @@ elif page == "Admin Controls":
     st.subheader("Admin Controls")
 
     st.write("### Add Staff")
+
     new_staff = st.text_input("Staff Name")
 
     if st.button("Add Staff"):
