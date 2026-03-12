@@ -241,45 +241,6 @@ if page == "Sales Entry":
 
     st.button("Add Another Entry", on_click=add_row)
 
-    # ---------------- Payments (cumulative) ----------------
-    st.subheader("Payments")
-    paytm = float(st.number_input("Paytm", 0.0, step=0.01))
-    sbi = float(st.number_input("SBI", 0.0, step=0.01))
-    hppay = float(st.number_input("HP Pay", 0.0, step=0.01))
-    advance = float(st.number_input("Advance Paid", 0.0, step=0.01))
-    creditor = float(st.number_input("Creditor", 0.0, step=0.01))
-
-    # ---------------- SAVE ALL ENTRIES ----------------
-    if st.button("Save All Entries"):
-        for entry in st.session_state.multi_entries:
-            nozzle_int = int(entry["nozzle"])
-            opening = entry["opening"]
-            closing = entry["closing"]
-            fuel = entry["fuel"]
-            litres = round(max(closing - opening, 0), 2)
-            price = float(fuel_price[fuel])
-            total = round(litres * price, 2)
-            balance = round(total - (paytm + sbi + hppay + advance + creditor), 2)
-            try:
-                cursor.execute("""
-                    INSERT INTO sales(
-                        date, staff, nozzle, fuel, opening, closing, litres, price, total,
-                        paytm, sbi, hppay, advance, creditor, balance,
-                        time_in, time_out, hours
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    str(date.today()), staff, nozzle_int, fuel, opening, closing, litres, price, total,
-                    paytm, sbi, hppay, advance, creditor, balance,
-                    t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
-                ))
-            except Exception as e:
-                st.error(f"Error Saving Entry: {e}")
-        conn.commit()
-        st.success("All Sales Entries Saved ✅")
-        # Reset entries for next batch
-        st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
-
-
     # ---------------- TODAY SUMMARY ----------------
     st.markdown("---")
     st.subheader("Today Staff Summary")
