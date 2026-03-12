@@ -10,7 +10,7 @@ st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# --- CREATE OR FIX TABLES ---
+# --- CREATE TABLES ---
 def create_tables():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sales(
@@ -90,6 +90,10 @@ def read_sales():
 # ---------------- SALES ENTRY ----------------
 if page=="Sales Entry":
     st.title("Fuel Sales Entry")
+    
+    # Date selection
+    sale_date = st.date_input("Select Date", date.today())
+
     staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
     if not staff_list:
         st.warning("Admin must add staff first")
@@ -97,7 +101,7 @@ if page=="Sales Entry":
     staff = st.selectbox("Staff",staff_list)
 
     # Checklist validation
-    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(str(date.today()),staff))
+    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(str(sale_date),staff))
     result = cursor.fetchone()
     if not result or result[0]==0:
         st.error(f"⚠ Sales blocked for {staff}. Staff Daily Checklist not completed.")
@@ -107,8 +111,8 @@ if page=="Sales Entry":
     col1,col2 = st.columns(2)
     with col1: time_in = st.time_input("Duty IN", value=time(9,0))
     with col2: time_out = st.time_input("Duty OUT", value=time(18,0))
-    t1 = datetime.combine(date.today(), time_in)
-    t2 = datetime.combine(date.today(), time_out)
+    t1 = datetime.combine(sale_date, time_in)
+    t2 = datetime.combine(sale_date, time_out)
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
@@ -145,7 +149,7 @@ if page=="Sales Entry":
             INSERT INTO sales(date,staff,nozzle,fuel,opening,closing,litres,price,total,
             paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,(str(date.today()),staff,nozzle_int,fuel,opening,closing,litres,price,total,
+            """,(str(sale_date),staff,nozzle_int,fuel,opening,closing,litres,price,total,
                  paytm,sbi,hppay,advance,creditor,balance,t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours))
             conn.commit()
             st.success("Sales Entry Saved ✅")
@@ -155,7 +159,7 @@ if page=="Sales Entry":
     # Today Summary
     st.markdown("---")
     df_today = read_sales()
-    today_sales = df_today[df_today["date"]==str(date.today())]
+    today_sales = df_today[df_today["date"]==str(sale_date)]
     if not today_sales.empty:
         summary = today_sales.groupby("staff").agg(
             Opening=("opening","sum"),
@@ -172,12 +176,12 @@ if page=="Sales Entry":
         ).reset_index()
         summary["Cash Short"]=summary["CashBalance"].apply(lambda x: abs(x) if x<0 else 0)
         summary["Cash Excess"]=summary["CashBalance"].apply(lambda x: x if x>0 else 0)
-        st.subheader("Today Staff Summary")
+        st.subheader(f"Staff Summary for {sale_date}")
         st.dataframe(summary,use_container_width=True)
-        st.subheader("Staff Litre Graph Today")
+        st.subheader("Staff Litre Graph")
         st.bar_chart(summary.set_index("staff")["Litres"])
     else:
-        st.info("No sales entries for today")
+        st.info("No sales entries for this date")
 
 # ---------------- REPORTS ----------------
 elif page=="Reports":
