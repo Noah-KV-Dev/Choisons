@@ -8,7 +8,6 @@ import socket
 conn = sqlite3.connect("petrol_sales.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 date TEXT,
@@ -51,10 +50,7 @@ conn.commit()
 # ---------------- DEFAULT FUEL PRICES ----------------
 default_prices = {"Petrol":100.0,"Diesel":90.0,"Power Petrol":105.0}
 for fuel, price in default_prices.items():
-    cursor.execute(
-        "INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)",
-        (fuel, float(price))
-    )
+    cursor.execute("INSERT OR IGNORE INTO fuel_prices(fuel, price) VALUES (?, ?)", (fuel, float(price)))
 conn.commit()
 
 # ---------------- PAGE CONFIG ----------------
@@ -80,6 +76,7 @@ def load_data():
         if col not in df.columns:
             df[col] = 0 if col not in ["vehicle_number","creditor_name"] else ""
     df.fillna({"paytm":0,"hp_pay":0,"cash":0,"credit":0,"advance_paid":0,"balance_cash":0,"vehicle_number":"","creditor_name":""}, inplace=True)
+    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
     return df
 
 fuel_prices_df = pd.read_sql("SELECT * FROM fuel_prices", conn)
@@ -88,36 +85,42 @@ staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
 creditor_list = pd.read_sql("SELECT name FROM creditors", conn)["name"].tolist()
 df = load_data()
 
-# ---------------- SIDEBAR MENU ----------------
-menu_option = st.sidebar.selectbox("Menu", ["Sales Entry", "Reports & Summary"])
-
-# ---------------- ADMIN LOGIN ----------------
+# ---------------- SESSION STATE ----------------
 if "logged_in_admin" not in st.session_state:
     st.session_state.logged_in_admin = None
 
-st.sidebar.subheader("Admin Login")
-admin_name = st.sidebar.text_input("Admin Username")
-admin_password = st.sidebar.text_input("Password", type="password")
-if st.sidebar.button("Login as Admin"):
-    if admin_password == "admin786":
-        login_time = datetime.now()
-        ip_address = socket.gethostbyname(socket.gethostname())
-        cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
-                       (admin_name, str(login_time), ip_address))
-        conn.commit()
-        st.session_state.logged_in_admin = admin_name
-        st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
-    else:
-        st.sidebar.error("Incorrect Password!")
+# ---------------- SIDEBAR MENU ----------------
+menu_options = ["Sales Entry", "Reports & Summary"]
+if st.session_state.get("logged_in_admin"):
+    menu_options.append("Admin Controls")  # Only visible after admin login
+menu_option = st.sidebar.selectbox("Menu", menu_options)
 
-if st.session_state.logged_in_admin:
-    if st.sidebar.button("Logout Admin"):
+# ---------------- ADMIN LOGIN ----------------
+if not st.session_state.get("logged_in_admin"):
+    st.sidebar.subheader("Admin Login")
+    admin_name = st.sidebar.text_input("Admin Username", key="login_admin_user")
+    admin_password = st.sidebar.text_input("Password", type="password", key="login_admin_pass")
+    if st.sidebar.button("Login as Admin", key="login_admin_btn"):
+        if admin_password == "admin786":
+            login_time = datetime.now()
+            ip_address = socket.gethostbyname(socket.gethostname())
+            cursor.execute("INSERT INTO admin_logs(admin_name, login_time, ip_address) VALUES (?,?,?)", 
+                           (admin_name, str(login_time), ip_address))
+            conn.commit()
+            st.session_state.logged_in_admin = admin_name
+            st.sidebar.success(f"Admin {admin_name} logged in at {login_time.strftime('%H:%M:%S')}")
+            st.experimental_rerun()
+        else:
+            st.sidebar.error("Incorrect Password!")
+else:
+    if st.sidebar.button("Logout Admin", key="logout_admin_btn"):
         logout_time = datetime.now()
         cursor.execute("UPDATE admin_logs SET logout_time=? WHERE admin_name=? AND logout_time IS NULL",
                        (str(logout_time), st.session_state.logged_in_admin))
         conn.commit()
         st.sidebar.success(f"Admin {st.session_state.logged_in_admin} logged out at {logout_time.strftime('%H:%M:%S')}")
         st.session_state.logged_in_admin = None
+        st.experimental_rerun()
 
 # ---------------- SALES ENTRY ----------------
 if menu_option == "Sales Entry":
@@ -148,11 +151,8 @@ if menu_option == "Sales Entry":
 
     creditor_name = ""
     vehicle_number = ""
-    if credit>0:
-        if creditor_list:
-            creditor_name = st.selectbox("Select Creditor", creditor_list)
-        else:
-            st.warning("No creditors available. Admin must add creditors.")
+    if credit>0 and creditor_list:
+        creditor_name = st.selectbox("Select Creditor", creditor_list)
         vehicle_number = st.text_input("Vehicle Number")
 
     duty_in = st.time_input("Duty IN")
@@ -162,7 +162,7 @@ if menu_option == "Sales Entry":
     hours = max((out_time-in_time).total_seconds()/3600,0)
     ip_address = socket.gethostbyname(socket.gethostname())
 
-    if st.button("Save Entry"):
+    if st.button("Save Entry", key="save_sales_btn"):
         cursor.execute("""INSERT INTO sales VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
             str(entry_date), staff, fuel, nozzle, opening, closing, litres, price, total,
             paytm, hp_pay, cash, credit, advance_paid, balance_cash, creditor_name,
@@ -172,26 +172,6 @@ if menu_option == "Sales Entry":
         st.success("Entry Saved")
         df = load_data()
         st.experimental_rerun()
-
-    # ---------------- DAILY SUMMARY ----------------
-    st.subheader("Daily Summary (Per Staff)")
-    daily_data = df[df["date"]==str(date.today())]
-    if not daily_data.empty:
-        daily_summary = daily_data.groupby(["date","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
-        st.dataframe(daily_summary)
-    else:
-        st.info("No sales today.")
-
-    # ---------------- MONTHLY SUMMARY ----------------
-    st.subheader("Monthly Summary (Per Staff)")
-    df['month'] = pd.to_datetime(df['date']).dt.to_period('M')
-    month_period = pd.Period(str(date.today()), freq='M')
-    monthly_data = df[df['month']==month_period]
-    if not monthly_data.empty:
-        monthly_summary = monthly_data.groupby(["month","staff"])[["litres","total","paytm","hp_pay","cash","credit","advance_paid","balance_cash","hours"]].sum().reset_index()
-        st.dataframe(monthly_summary)
-    else:
-        st.info("No sales this month.")
 
 # ---------------- REPORTS & SUMMARY ----------------
 elif menu_option == "Reports & Summary":
@@ -228,38 +208,34 @@ elif menu_option == "Reports & Summary":
     st.dataframe(monthly_summary)
 
 # ---------------- ADMIN CONTROLS ----------------
-# Only visible for logged-in admin
-if st.session_state.get("logged_in_admin"):
+if menu_option == "Admin Controls" and st.session_state.get("logged_in_admin"):
     st.subheader(f"Admin Controls ({st.session_state.logged_in_admin})")
     st.text("Only logged-in admin can manage staff, creditors, and fuel prices")
 
-    # Add Staff
-    st.subheader("Add Staff")
-    new_staff = st.text_input("Staff Name", key="new_staff")
-    if st.button("Add Staff"):
+    # Add Staff - unique keys
+    new_staff_admin = st.text_input("Staff Name", key="admin_new_staff")
+    if st.button("Add Staff", key="admin_add_staff_btn"):
         try:
-            cursor.execute("INSERT INTO staff(name) VALUES (?)",(new_staff,))
+            cursor.execute("INSERT INTO staff(name) VALUES (?)", (new_staff_admin,))
             conn.commit()
             st.success("Staff Added")
         except:
             st.error("Staff Exists")
 
-    # Add Creditor
-    st.subheader("Add Creditor")
-    new_creditor = st.text_input("Creditor Name", key="new_creditor")
-    if st.button("Add Creditor"):
+    # Add Creditor - unique keys
+    new_creditor_admin = st.text_input("Creditor Name", key="admin_new_creditor")
+    if st.button("Add Creditor", key="admin_add_creditor_btn"):
         try:
-            cursor.execute("INSERT INTO creditors(name) VALUES (?)",(new_creditor,))
+            cursor.execute("INSERT INTO creditors(name) VALUES (?)", (new_creditor_admin,))
             conn.commit()
             st.success("Creditor Added")
         except:
             st.error("Creditor Exists")
 
-    # Update Fuel Prices
-    st.subheader("Update Fuel Prices")
+    # Update Fuel Prices - unique keys
     for fuel in ["Petrol","Diesel","Power Petrol"]:
-        new_price = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"price_{fuel}")
-        if st.button(f"Update {fuel}"):
-            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?",(new_price,fuel))
+        new_price_admin = st.number_input(f"{fuel} Price", value=fuel_price_dict.get(fuel,100.0), key=f"admin_price_{fuel}")
+        if st.button(f"Update {fuel}", key=f"admin_update_{fuel}_btn"):
+            cursor.execute("UPDATE fuel_prices SET price=? WHERE fuel=?", (new_price_admin, fuel))
             conn.commit()
             st.success(f"{fuel} price updated")
