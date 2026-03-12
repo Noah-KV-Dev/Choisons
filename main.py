@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, time
 
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
 
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +24,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price RE
 cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
 conn.commit()
 
-# Default fuels
+# ---------------- DEFAULT FUEL PRICES ----------------
 default_fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
 for f,p in default_fuels.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
@@ -42,7 +42,7 @@ menu=["Sales Entry","Reports","Staff Daily Checklist"]
 if st.session_state.admin: menu.append("Admin Panel")
 page = st.sidebar.selectbox("Menu",menu)
 
-# Admin login/logout below menu
+# ---------------- ADMIN LOGIN ----------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
@@ -68,7 +68,7 @@ if page=="Sales Entry":
         st.stop()
     staff = st.selectbox("Staff",staff_list)
 
-    # Checklist check
+    # Checklist validation
     cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(str(date.today()),staff))
     result = cursor.fetchone()
     if not result or result[0]==0:
@@ -77,30 +77,27 @@ if page=="Sales Entry":
 
     # Duty times
     col1,col2 = st.columns(2)
-    with col1: time_in = st.time_input("Duty IN")
-    with col2: time_out = st.time_input("Duty OUT")
-    t1 = datetime.combine(date.today(),time_in)
-    t2 = datetime.combine(date.today(),time_out)
+    with col1: time_in = st.time_input("Duty IN", value=time(9,0))
+    with col2: time_out = st.time_input("Duty OUT", value=time(18,0))
+    t1 = datetime.combine(date.today(), time_in if isinstance(time_in,time) else time.fromisoformat(time_in))
+    t2 = datetime.combine(date.today(), time_out if isinstance(time_out,time) else time.fromisoformat(time_out))
     hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
     # Nozzle and opening
     nozzle = st.selectbox("Nozzle", list(range(1,13)))
-    try:
-        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(int(nozzle),))
-        last = cursor.fetchone()
-        opening_default = float(last[0]) if last and last[0] is not None else 0.0
-    except:
-        opening_default = 0.0
+    cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(int(nozzle),))
+    last = cursor.fetchone()
+    opening_default = float(last[0]) if last and last[0] is not None else 0.0
     opening = st.number_input("Opening Meter", value=opening_default)
     closing = st.number_input("Closing Meter",0.0)
-    litres = max(closing-opening,0)
+    litres = round(max(closing-opening,0),2)
 
-    # Fuel
+    # Fuel selection
     fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
-    price = fuel_price[fuel]
+    price = float(fuel_price[fuel])
     st.info(f"Fuel Price ₹ {price}")
-    total = litres*price
+    total = round(litres*price,2)
     st.success(f"Litres {litres} | Amount ₹ {total}")
 
     # Payments
@@ -110,10 +107,10 @@ if page=="Sales Entry":
     hppay = st.number_input("HP Pay",0.0)
     advance = st.number_input("Advance Paid",0.0)
     creditor = st.number_input("Creditor",0.0)
-    balance = total-(paytm+sbi+hppay+advance+creditor)
+    balance = round(total-(paytm+sbi+hppay+advance+creditor),2)
     st.warning(f"Balance Cash ₹ {balance}")
 
-    # Save
+    # Save entry
     if st.button("Save Entry"):
         cursor.execute("""
         INSERT INTO sales(
@@ -123,12 +120,12 @@ if page=="Sales Entry":
         """,(
         str(date.today()),staff,nozzle,fuel,opening,closing,
         litres,price,total,paytm,sbi,hppay,advance,creditor,balance,
-        time_in.strftime("%H:%M"),time_out.strftime("%H:%M"),hours
+        t1.strftime("%H:%M"),t2.strftime("%H:%M"),hours
         ))
         conn.commit()
         st.success("Entry Saved")
 
-    # Today summary
+    # Today's summary
     st.markdown("---")
     st.subheader("Today Staff Summary")
     df = pd.read_sql("SELECT * FROM sales",conn)
@@ -215,7 +212,8 @@ elif page=="Admin Panel":
             cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
             conn.commit()
             st.success("Staff Added")
-        except: st.error("Staff Exists")
+        except:
+            st.error("Staff Exists")
     staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
     if staff_list:
         remove=st.selectbox("Remove Staff",staff_list)
