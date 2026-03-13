@@ -101,7 +101,7 @@ if page=="Sales Entry":
     total_amount=0
 
     for i, entry in enumerate(st.session_state.multi_entries):
-        # Column widths: Nozzle=0.5, Fuel=1.2, Opening=2, Closing=2, Litres=0.5, Amount=0.9
+        # Column widths: Nozzle=0.7, Fuel=1.2, Opening=2, Closing=2, Litres=0.5, Amount=0.9
         cols = st.columns([0.5,1.2,2,2,0.5,0.9])
         
         # Nozzle
