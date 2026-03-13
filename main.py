@@ -223,7 +223,33 @@ for i, entry in enumerate(st.session_state.multi_entries):
     else:
         st.info("No sales entries for today")
 
-# ---------------- REPORTS ----------------
+if page == "Sales Entry":
+    st.title("Fuel Sales Entry")
+
+    # --- your multi-entry code here ---
+    for i, entry in enumerate(st.session_state.multi_entries):
+        cols = st.columns([0.7,1.2,2,2,0.8,0.8])
+        entry["nozzle"] = cols[0].number_input("Nozzle", value=entry.get("nozzle",1), key=f"nozzle_{i}")
+        entry["fuel"] = cols[1].selectbox("Fuel", list(fuel_price.keys()), index=0, key=f"fuel_{i}")
+        entry["opening"] = cols[2].number_input("Opening", value=float(entry.get("opening",0)), key=f"opening_{i}")
+        entry["closing"] = cols[3].number_input("Closing", value=float(entry.get("closing",0)), key=f"closing_{i}")
+        litres = round(max(entry["closing"] - entry["opening"],0),2)
+        amount = round(litres * fuel_price[entry["fuel"]],2)
+        entry["litres"] = litres
+        entry["total"] = amount
+        cols[4].write(f"Litres: {litres}")
+        cols[5].write(f"Amount: ₹ {amount}")
+
+    if st.button("Save All Entries"):
+        for entry in st.session_state.multi_entries:
+            cursor.execute("""
+                INSERT INTO sales(date, staff, nozzle, fuel, opening, closing, litres, price, total)
+                VALUES(?,?,?,?,?,?,?,?,?)
+            """,(str(date.today()), staff, entry["nozzle"], entry["fuel"], entry["opening"], entry["closing"], entry["litres"], fuel_price[entry["fuel"]], entry["total"]))
+        conn.commit()
+        st.success("All Entries Saved ✅")
+
+# <--- NOW elif WILL WORK -->
 elif page == "Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
