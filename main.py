@@ -93,7 +93,7 @@ else:
         st.success("Logged Out ✅")
 
 if page == "Sales Entry":
-    st.title("Fuel Sales Entry (Multiple Opening/Closing)")
+    st.title("Fuel Sales Entry")
 
     # --- Staff Selection ---
     staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
