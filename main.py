@@ -1,30 +1,22 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-from datetime import date, datetime, time
+from datetime import date, datetime
 
-# ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="Choisons Petrol Pump", layout="wide")
-# ---------------- TITLE & CONTACT ----------------
-st.title("⛽ Choisons Petrol Pump Management System")
-st.info("""
-*Contact Details*  
 
-Phone: +91 8590304889  
-Email: kvpnaseeh@gmail.com / choisonscalicut@gmail.com  
-
-Created by Nazeeh
-""")
 # ---------------- DATABASE ----------------
 conn = sqlite3.connect("petrol_pump.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Create tables if not exist
+# Tables
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sales(
 id INTEGER PRIMARY KEY AUTOINCREMENT,
-date TEXT, staff TEXT, opening REAL, closing REAL,
-fuel TEXT
+date TEXT, staff TEXT, nozzle INTEGER, fuel TEXT,
+opening REAL, closing REAL, litres REAL, price REAL, total REAL,
+paytm REAL, sbi REAL, hppay REAL, advance REAL, creditor REAL, balance REAL,
+time_in TEXT, time_out TEXT, hours REAL
 )
 """)
 cursor.execute("CREATE TABLE IF NOT EXISTS staff(name TEXT UNIQUE)")
@@ -32,30 +24,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS fuel_price(fuel TEXT UNIQUE, price RE
 cursor.execute("CREATE TABLE IF NOT EXISTS checklist(date TEXT, staff TEXT, completed INTEGER, PRIMARY KEY(date,staff))")
 conn.commit()
 
-# ---------------- ENSURE REQUIRED COLUMNS ----------------
-required_columns = {
-    "nozzle": "INTEGER DEFAULT 1",
-    "litres": "REAL DEFAULT 0",
-    "price": "REAL DEFAULT 0",
-    "total": "REAL DEFAULT 0",
-    "paytm": "REAL DEFAULT 0",
-    "sbi": "REAL DEFAULT 0",
-    "hppay": "REAL DEFAULT 0",
-    "advance": "REAL DEFAULT 0",
-    "creditor": "REAL DEFAULT 0",
-    "balance": "REAL DEFAULT 0",
-    "time_in": "TEXT DEFAULT '00:00'",
-    "time_out": "TEXT DEFAULT '00:00'",
-    "hours": "REAL DEFAULT 0"
-}
-
-existing_columns = [c[1] for c in cursor.execute("PRAGMA table_info(sales)").fetchall()]
-for col, col_type in required_columns.items():
-    if col not in existing_columns:
-        cursor.execute(f"ALTER TABLE sales ADD COLUMN {col} {col_type}")
-conn.commit()
-
-# Default fuel prices
+# Default fuels
 default_fuels = {"Petrol":100,"Diesel":90,"Power Petrol":105,"Oil":120}
 for f,p in default_fuels.items():
     cursor.execute("INSERT OR IGNORE INTO fuel_price VALUES(?,?)",(f,p))
@@ -73,139 +42,100 @@ menu=["Sales Entry","Reports","Staff Daily Checklist"]
 if st.session_state.admin: menu.append("Admin Panel")
 page = st.sidebar.selectbox("Menu",menu)
 
-# ---------------- ADMIN LOGIN ----------------
+# Admin login/logout below menu
 st.sidebar.markdown("---")
 st.sidebar.subheader("Admin Login")
 if not st.session_state.admin:
     pw = st.sidebar.text_input("Password",type="password")
-    login_clicked = st.sidebar.button("Login")
-    if login_clicked:
+    if st.sidebar.button("Login"):
         if pw=="admin786":
             st.session_state.admin=True
-            st.success("Admin Logged In ✅")
+            st.experimental_rerun()
         else:
             st.sidebar.error("Wrong Password")
 else:
     st.sidebar.success("Admin Logged In")
-    logout_clicked = st.sidebar.button("Logout")
-    if logout_clicked:
+    if st.sidebar.button("Logout"):
         st.session_state.admin=False
-        st.success("Logged Out ✅")
+        st.experimental_rerun()
 
-if page == "Sales Entry":
+# ---------------- SALES ENTRY ----------------
+if page=="Sales Entry":
     st.title("Fuel Sales Entry")
-
-    # --- Staff Selection ---
-    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+    staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
     if not staff_list:
         st.warning("Admin must add staff first")
         st.stop()
-    staff = st.selectbox("Staff", staff_list)
+    staff = st.selectbox("Staff",staff_list)
 
-    # --- Checklist validation ---
-    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?", (str(date.today()), staff))
+    # Checklist check
+    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?",(str(date.today()),staff))
     result = cursor.fetchone()
-    if not result or result[0] == 0:
+    if not result or result[0]==0:
         st.error(f"⚠ Sales blocked for {staff}. Staff Daily Checklist not completed.")
         st.stop()
 
-    # --- Duty Times ---
-    col1, col2 = st.columns(2)
-    with col1:
-        time_in = st.time_input("Duty IN", value=time(9, 0))
-    with col2:
-        time_out = st.time_input("Duty OUT", value=time(18, 0))
-    t1 = datetime.combine(date.today(), time_in)
-    t2 = datetime.combine(date.today(), time_out)
-    hours = round((t2 - t1).seconds / 3600, 2)
+    # Duty times
+    col1,col2 = st.columns(2)
+    with col1: time_in = st.time_input("Duty IN")
+    with col2: time_out = st.time_input("Duty OUT")
+    t1 = datetime.combine(date.today(),time_in)
+    t2 = datetime.combine(date.today(),time_out)
+    hours = round((t2-t1).seconds/3600,2)
     st.info(f"Working Hours: {hours}")
 
-    # ---------------- Multi-Entry Setup ----------------
-    if "multi_entries" not in st.session_state:
-        st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
+    # Nozzle and opening
+    nozzle = st.selectbox("Nozzle", list(range(1,13)))
+    try:
+        cursor.execute("SELECT closing FROM sales WHERE nozzle=? ORDER BY id DESC LIMIT 1",(int(nozzle),))
+        last = cursor.fetchone()
+        opening_default = float(last[0]) if last and last[0] is not None else 0.0
+    except:
+        opening_default = 0.0
+    opening = st.number_input("Opening Meter", value=opening_default)
+    closing = st.number_input("Closing Meter",0.0)
+    litres = max(closing-opening,0)
 
-    def add_entry():
-        st.session_state.multi_entries.append({
-            "nozzle": 1,
-            "fuel": list(fuel_price.keys())[0],
-            "opening": 0.0,
-            "closing": 0.0
-        })
+    # Fuel
+    fuel = st.selectbox("Fuel Type",list(fuel_price.keys()))
+    price = fuel_price[fuel]
+    st.info(f"Fuel Price ₹ {price}")
+    total = litres*price
+    st.success(f"Litres {litres} | Amount ₹ {total}")
 
-    st.button("Add Another Entry", on_click=add_entry, key="add_entry_button")
+    # Payments
+    st.subheader("Payments")
+    paytm = st.number_input("Paytm",0.0)
+    sbi = st.number_input("SBI",0.0)
+    hppay = st.number_input("HP Pay",0.0)
+    advance = st.number_input("Advance Paid",0.0)
+    creditor = st.number_input("Creditor",0.0)
+    balance = total-(paytm+sbi+hppay+advance+creditor)
+    st.warning(f"Balance Cash ₹ {balance}")
 
-    # ---------------- Sales Form ----------------
-    with st.form(key="sales_form"):
-        total_litres = 0
-        total_amount = 0
+    # Save
+    if st.button("Save Entry"):
+        cursor.execute("""
+        INSERT INTO sales(
+        date,staff,nozzle,fuel,opening,closing,litres,price,total,
+        paytm,sbi,hppay,advance,creditor,balance,time_in,time_out,hours
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """,(
+        str(date.today()),staff,nozzle,fuel,opening,closing,
+        litres,price,total,paytm,sbi,hppay,advance,creditor,balance,
+        time_in.strftime("%H:%M"),time_out.strftime("%H:%M"),hours
+        ))
+        conn.commit()
+        st.success("Entry Saved")
 
-        for i, entry in enumerate(st.session_state.multi_entries):
-            cols = st.columns([0.7, 1.2, 2, 2, 0.8, 0.8])
-            entry["nozzle"] = cols[0].number_input(
-                f"Nozzle {i+1}", min_value=1, max_value=12, value=entry.get("nozzle",1),
-                key=f"nozzle_{i}_{len(st.session_state.multi_entries)}"
-            )
-            entry["fuel"] = cols[1].selectbox(
-                f"Fuel {i+1}", list(fuel_price.keys()),
-                index=list(fuel_price.keys()).index(entry.get("fuel", list(fuel_price.keys())[0])),
-                key=f"fuel_{i}_{len(st.session_state.multi_entries)}"
-            )
-            entry["opening"] = cols[2].number_input(
-                f"Opening {i+1}", value=float(entry.get("opening",0)), step=0.01, format="%.2f",
-                key=f"opening_{i}_{len(st.session_state.multi_entries)}"
-            )
-            entry["closing"] = cols[3].number_input(
-                f"Closing {i+1}", value=float(entry.get("closing",0)), step=0.01, format="%.2f",
-                key=f"closing_{i}_{len(st.session_state.multi_entries)}"
-            )
-            price = float(fuel_price[entry["fuel"]])
-            litres = round(max(entry["closing"] - entry["opening"],0),2)
-            amount = round(litres * price,2)
-            entry["litres"] = litres
-            entry["total"] = amount
-            total_litres += litres
-            total_amount += amount
-            cols[4].write(f"Litres: {litres}")
-            cols[5].write(f"Amount: ₹ {amount}")
-
-        st.markdown(f"### Grand Total Litres: {total_litres} | Grand Total Amount: ₹ {total_amount}")
-
-        # ---------------- Payments ----------------
-        st.subheader("Payments")
-        paytm = st.number_input("Paytm", 0.0, step=0.01)
-        sbi = st.number_input("SBI", 0.0, step=0.01)
-        hppay = st.number_input("HP Pay", 0.0, step=0.01)
-        advance = st.number_input("Advance Paid", 0.0, step=0.01)
-        creditor = st.number_input("Creditor", 0.0, step=0.01)
-
-        submit = st.form_submit_button("Save All Entries")
-        if submit:
-            for entry in st.session_state.multi_entries:
-                balance = round(entry["total"] - (paytm + sbi + hppay + advance + creditor), 2)
-                try:
-                    cursor.execute("""
-                        INSERT INTO sales(
-                            date, staff, nozzle, fuel, opening, closing, litres, price, total,
-                            paytm, sbi, hppay, advance, creditor, balance,
-                            time_in, time_out, hours
-                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                    """, (
-                        str(date.today()), staff, int(entry["nozzle"]), entry["fuel"], entry["opening"], entry["closing"], entry["litres"], float(fuel_price[entry["fuel"]]), entry["total"],
-                        paytm, sbi, hppay, advance, creditor, balance,
-                        t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
-                    ))
-                except Exception as e:
-                    st.error(f"Error saving entry: {e}")
-            conn.commit()
-            st.success("All Sales Entries Saved ✅")
-            # Reset entries for next batch
-            st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
-
-    # ---------------- TODAY SUMMARY ----------------
+    # Today summary
     st.markdown("---")
     st.subheader("Today Staff Summary")
     df = pd.read_sql("SELECT * FROM sales",conn)
     today = df[df["date"]==str(date.today())]
+    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
+        if col not in today.columns: today[col]=0
+
     if not today.empty:
         summary = today.groupby("staff").agg(
             Opening=("opening","sum"),
@@ -228,75 +158,29 @@ if page == "Sales Entry":
     else:
         st.info("No sales entries for today")
 
-
-    for i, entry in enumerate(st.session_state.multi_entries):
-        # Adjusted column widths: Nozzle/Fuel/Opening/Closing/Litres/Amount
-        cols = st.columns([0.7, 1.2, 2, 2, 0.8, 0.8])
-        entry["nozzle"] = cols[0].number_input(
-            f"Nozzle {i+1}", min_value=1, max_value=12, value=entry.get("nozzle", 1), 
-            key=f"nozzle_{i}_{len(st.session_state.multi_entries)}"
-        )
-        entry["fuel"] = cols[1].selectbox(
-            f"Fuel {i+1}", list(fuel_price.keys()),
-            index=list(fuel_price.keys()).index(entry.get("fuel", list(fuel_price.keys())[0])),
-            key=f"fuel_{i}_{len(st.session_state.multi_entries)}"
-        )
-        entry["opening"] = cols[2].number_input(
-            f"Opening {i+1}", value=float(entry.get("opening", 0)), step=0.01, format="%.2f",
-            key=f"opening_{i}_{len(st.session_state.multi_entries)}"
-        )
-        entry["closing"] = cols[3].number_input(
-            f"Closing {i+1}", value=float(entry.get("closing", 0)), step=0.01, format="%.2f",
-            key=f"closing_{i}_{len(st.session_state.multi_entries)}"
-        )
-        price = float(fuel_price[entry["fuel"]])
-        litres = round(max(entry["closing"] - entry["opening"], 0), 2)
-        amount = round(litres * price, 2)
-        entry["litres"] = litres
-        entry["total"] = amount
-        total_litres += litres
-        total_amount += amount
-        cols[4].write(f"Litres: {litres}")
-        cols[5].write(f"Amount: ₹ {amount}")
-
-    st.button("Add Another Entry", on_click=add_entry)
-
-    st.markdown(f"### Grand Total Litres: {total_litres} | Grand Total Amount: ₹ {total_amount}")
-
-    # ---------------- Payments (once per batch) ----------------
-    st.subheader("Payments")
-    paytm = float(st.number_input("Paytm", 0.0, step=0.01))
-    sbi = float(st.number_input("SBI", 0.0, step=0.01))
-    hppay = float(st.number_input("HP Pay", 0.0, step=0.01))
-    advance = float(st.number_input("Advance Paid", 0.0, step=0.01))
-    creditor = float(st.number_input("Creditor", 0.0, step=0.01))
-
-    # ---------------- Save Entries ----------------
-    if st.button("Save All Entries"):
-        if not st.session_state.multi_entries:
-            st.warning("No entries to save")
-        else:
-            for entry in st.session_state.multi_entries:
-                balance = round(entry["total"] - (paytm + sbi + hppay + advance + creditor), 2)
-                try:
-                    cursor.execute("""
-                        INSERT INTO sales(
-                            date, staff, nozzle, fuel, opening, closing, litres, price, total,
-                            paytm, sbi, hppay, advance, creditor, balance,
-                            time_in, time_out, hours
-                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                    """, (
-                        str(date.today()), staff, int(entry["nozzle"]), entry["fuel"], entry["opening"], entry["closing"], entry["litres"], float(fuel_price[entry["fuel"]]), entry["total"],
-                        paytm, sbi, hppay, advance, creditor, balance,
-                        t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
-                    ))
-                except Exception as e:
-                    st.error(f"Error saving entry: {e}")
-            conn.commit()
-            st.success("All Sales Entries Saved ✅")
-            # Reset entries
-            st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
-
+# ---------------- REPORTS ----------------
+elif page=="Reports":
+    st.title("Reports")
+    df = pd.read_sql("SELECT * FROM sales",conn)
+    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
+        if col not in df.columns: df[col]=0
+    report_type = st.selectbox("Report Type",["Daily","Monthly"])
+    if report_type=="Daily":
+        d = st.date_input("Select Date",date.today())
+        r = df[df["date"]==str(d)]
+        st.dataframe(r)
+        if not r.empty:
+            daily_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
+            st.bar_chart(daily_summary.set_index("staff")["Litres"])
+    else:
+        df["month"]=df["date"].str.slice(0,7)
+        months=df["month"].unique()
+        m=st.selectbox("Month",months)
+        r=df[df["month"]==m]
+        st.dataframe(r)
+        if not r.empty:
+            monthly_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
+            st.bar_chart(monthly_summary.set_index("staff")["Litres"])
 
 # ---------------- STAFF DAILY CHECKLIST ----------------
 elif page=="Staff Daily Checklist":
@@ -325,66 +209,24 @@ elif page=="Staff Daily Checklist":
 # ---------------- ADMIN PANEL ----------------
 elif page=="Admin Panel":
     st.title("Admin Panel")
-
-    # ---------------- STAFF MANAGEMENT ----------------
-    st.subheader("Staff Management")
-    new_staff = st.text_input("Add New Staff")
+    new_staff=st.text_input("Add Staff")
     if st.button("Add Staff"):
-        if new_staff.strip() != "":
-            try:
-                cursor.execute("INSERT INTO staff(name) VALUES(?)",(new_staff.strip(),))
-                conn.commit()
-                st.success(f"Staff '{new_staff}' Added ✅")
-            except sqlite3.IntegrityError:
-                st.error("Staff Already Exists ❌")
-        else:
-            st.warning("Enter a valid staff name")
-
-    staff_list = pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
-    if staff_list:
-        remove_staff = st.selectbox("Remove Staff", staff_list)
-        if st.button("Remove Selected Staff"):
-            cursor.execute("DELETE FROM staff WHERE name=?",(remove_staff,))
+        try:
+            cursor.execute("INSERT INTO staff VALUES(?)",(new_staff,))
             conn.commit()
-            st.success(f"Staff '{remove_staff}' Removed ✅")
-
-    # ---------------- FUEL PRICE MANAGEMENT ----------------
-    st.subheader("Fuel Price Management")
-    fuel_df = pd.read_sql("SELECT * FROM fuel_price",conn)
-    for index, row in fuel_df.iterrows():
-        fuel_name = row["fuel"]
-        fuel_price_val = st.number_input(f"{fuel_name} Price ₹", value=float(row["price"]), key=f"fuel_price_{index}")
-        if st.button(f"Update Price for {fuel_name}", key=f"update_fuel_{index}"):
-            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?", (fuel_price_val, fuel_name))
-            conn.commit()
-            st.success(f"Price for '{fuel_name}' updated to ₹{fuel_price_val} ✅")
-
-    # ---------------- DELETE SALES ENTRIES BY STAFF ----------------
-    st.subheader("Delete All Sales Entries by Staff")
+            st.success("Staff Added")
+        except: st.error("Staff Exists")
+    staff_list=pd.read_sql("SELECT name FROM staff",conn)["name"].tolist()
     if staff_list:
-        del_staff = st.selectbox("Select Staff to Delete All Sales Entries", staff_list)
-        confirm = st.checkbox("Confirm deletion of all entries for this staff")
-        if st.button(f"Delete All Sales for {del_staff}"):
-            if confirm:
-                cursor.execute("DELETE FROM sales WHERE staff=?",(del_staff,))
-                conn.commit()
-                st.success(f"All sales entries for '{del_staff}' have been deleted ✅")
-            else:
-                st.warning("Check the box to confirm deletion")
-    else:
-        st.info("No staff available")
-# ---------------- RESET STAFF DAILY CHECKLIST (Admin Only) ----------------
-if st.session_state.admin:
-    st.subheader("Reset Staff Daily Checklist")
-
-    # Load staff list
-    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-    if staff_list:
-        reset_staff = st.selectbox("Select Staff to Reset Checklist", staff_list)
-        if st.button(f"Reset Checklist for {reset_staff}"):
-            cursor.execute("UPDATE checklist SET completed=0 WHERE date=? AND staff=?", (str(date.today()), reset_staff))
+        remove=st.selectbox("Remove Staff",staff_list)
+        if st.button("Remove Staff"):
+            cursor.execute("DELETE FROM staff WHERE name=?",(remove,))
             conn.commit()
-            st.success(f"Checklist for '{reset_staff}' has been reset ✅. Sales entry is now blocked until checklist is completed.")
-    else:
-        st.info("No staff available")
-
+            st.success("Staff Removed")
+    st.subheader("Fuel Price Control")
+    for f in fuel_price:
+        new_price=st.number_input(f,value=float(fuel_price[f]))
+        if st.button(f"Update {f}"):
+            cursor.execute("UPDATE fuel_price SET price=? WHERE fuel=?",(new_price,f))
+            conn.commit()
+            st.success("Price Updated")
