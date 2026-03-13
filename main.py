@@ -96,8 +96,8 @@ if page=="Sales Entry":
     to_remove = []
 
     for i, entry in enumerate(st.session_state.multi_entries):
-        # Column widths: Nozzle=1, Fuel=1, Opening=2, Closing=2, Litres=0.5, Amount=0.5, Remove=1
-        cols = st.columns([1,1,2,2,0.5,0.5,1])
+        # Column widths: Nozzle=1, Fuel=1, Opening=2, Closing=2, Litres=0.3, Amount=0.3, Remove=1
+        cols = st.columns([1,1,2,2,0.3,0.3,1])
         
         # Nozzle
         entry["nozzle"] = cols[0].number_input(
@@ -122,10 +122,10 @@ if page=="Sales Entry":
         entry["closing"] = cols[3].number_input(
             "", value=entry.get("closing",entry.get("opening",default_opening)), key=f"closing_{i}", format="%.2f"
         )
-        # Litres (smaller display)
+        # Litres (very small)
         entry["litres"] = max(entry["closing"]-entry["opening"],0)
         cols[4].metric("", entry["litres"], delta=None)
-        # Amount (smaller display)
+        # Amount (very small)
         entry["price"] = fuel_price[entry["fuel"]]
         entry["total"] = round(entry["litres"]*entry["price"],2)
         cols[5].metric("", entry["total"], delta=None)
@@ -167,6 +167,7 @@ if page=="Sales Entry":
         conn.commit()
         st.success("All Entries Saved")
         st.session_state.multi_entries=[{}]  # reset entries
+
 
 
 
