@@ -101,8 +101,8 @@ if page=="Sales Entry":
     total_amount=0
 
     for i, entry in enumerate(st.session_state.multi_entries):
-        # Column widths: Nozzle=1, Fuel=1.2, Opening=2, Closing=2, Litres=0.5, Amount=0.9
-        cols = st.columns([1,1.2,2,2,0.5,0.9])
+        # Column widths: Nozzle=0.5, Fuel=1.2, Opening=2, Closing=2, Litres=0.5, Amount=0.9
+        cols = st.columns([0.5,1.2,2,2,0.5,0.9])
         
         # Nozzle
         entry["nozzle"] = cols[0].number_input(
@@ -127,13 +127,13 @@ if page=="Sales Entry":
         entry["closing"] = cols[3].number_input(
             "", value=entry.get("closing",entry.get("opening",default_opening)), key=f"closing_{i}", format="%.2f"
         )
-        # Litres (small font, very narrow)
+        # Litres (font size 15px)
         entry["litres"] = max(entry["closing"]-entry["opening"],0)
-        cols[4].markdown(f"<p style='font-size:12px;margin:0'>{entry['litres']:.2f}</p>", unsafe_allow_html=True)
-        # Amount (small font)
+        cols[4].markdown(f"<p style='font-size:15px;margin:0'>{entry['litres']:.2f}</p>", unsafe_allow_html=True)
+        # Amount (font size 15px)
         entry["price"] = fuel_price[entry["fuel"]]
         entry["total"] = round(entry["litres"]*entry["price"],2)
-        cols[5].markdown(f"<p style='font-size:12px;margin:0'>₹ {entry['total']:.2f}</p>", unsafe_allow_html=True)
+        cols[5].markdown(f"<p style='font-size:15px;margin:0'>₹ {entry['total']:.2f}</p>", unsafe_allow_html=True)
 
         total_amount += entry["total"]
 
@@ -165,6 +165,7 @@ if page=="Sales Entry":
         conn.commit()
         st.success("All Entries Saved")
         st.session_state.multi_entries=[{}]  # reset entries
+
 
 
 
