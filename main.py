@@ -224,6 +224,7 @@ for i, entry in enumerate(st.session_state.multi_entries):
         st.info("No sales entries for today")
 
 # ---------------- REPORTS ----------------
+    
 elif page=="Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
