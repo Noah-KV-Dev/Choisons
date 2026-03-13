@@ -225,7 +225,7 @@ for i, entry in enumerate(st.session_state.multi_entries):
 
 # ---------------- REPORTS ----------------
     
-elif page=="Reports":
+elif page == "Reports":
     st.title("Reports")
     df = pd.read_sql("SELECT * FROM sales",conn)
     for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
