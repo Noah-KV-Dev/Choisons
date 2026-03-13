@@ -86,18 +86,23 @@ if page=="Sales Entry":
 
     st.markdown("---")
     st.subheader("Multiple Nozzle Entry")
-    if "multi_entries" not in st.session_state: st.session_state.multi_entries=[{}]
+    if "multi_entries" not in st.session_state: 
+        st.session_state.multi_entries=[{}]
 
-    # Add new entry button
-    if st.button("Add Nozzle Entry"):
-        st.session_state.multi_entries.append({})
+    # Top buttons: Add new row & Remove last row
+    col_add,col_remove = st.columns([1,1])
+    with col_add:
+        if st.button("Add Nozzle Entry"):
+            st.session_state.multi_entries.append({})
+    with col_remove:
+        if st.button("Remove Last Entry") and st.session_state.multi_entries:
+            st.session_state.multi_entries.pop(-1)
 
     total_amount=0
-    to_remove = []
 
     for i, entry in enumerate(st.session_state.multi_entries):
-        # Column widths: Nozzle=1, Fuel=1, Opening=2, Closing=2, Litres=0.3, Amount=0.3, Remove=1
-        cols = st.columns([1,1,2,2,0.3,0.3,1])
+        # Column widths: Nozzle=1, Fuel=1, Opening=2, Closing=2, Litres=0.3, Amount=0.3
+        cols = st.columns([1,1,2,2,0.3,0.3])
         
         # Nozzle
         entry["nozzle"] = cols[0].number_input(
@@ -122,22 +127,15 @@ if page=="Sales Entry":
         entry["closing"] = cols[3].number_input(
             "", value=entry.get("closing",entry.get("opening",default_opening)), key=f"closing_{i}", format="%.2f"
         )
-        # Litres (very small)
+        # Litres (small)
         entry["litres"] = max(entry["closing"]-entry["opening"],0)
         cols[4].metric("", entry["litres"], delta=None)
-        # Amount (very small)
+        # Amount (small)
         entry["price"] = fuel_price[entry["fuel"]]
         entry["total"] = round(entry["litres"]*entry["price"],2)
         cols[5].metric("", entry["total"], delta=None)
-        # Remove button
-        if cols[6].button("Remove", key=f"remove_{i}"):
-            to_remove.append(i)
 
         total_amount += entry["total"]
-
-    # Remove entries marked for deletion
-    for i in reversed(to_remove):
-        st.session_state.multi_entries.pop(i)
 
     st.info(f"Grand Total Amount: ₹ {total_amount}")
 
@@ -167,6 +165,7 @@ if page=="Sales Entry":
         conn.commit()
         st.success("All Entries Saved")
         st.session_state.multi_entries=[{}]  # reset entries
+
 
 
 
