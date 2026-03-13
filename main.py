@@ -228,49 +228,6 @@ if page == "Sales Entry":
     else:
         st.info("No sales entries for today")
 
-if page == "Sales Entry":
-    st.title("Fuel Sales Entry (Multiple Opening/Closing)")
-
-    # --- Staff Selection ---
-    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
-    if not staff_list:
-        st.warning("Admin must add staff first")
-        st.stop()
-    staff = st.selectbox("Staff", staff_list)
-
-    # --- Checklist validation ---
-    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?", (str(date.today()), staff))
-    result = cursor.fetchone()
-    if not result or result[0] == 0:
-        st.error(f"⚠ Sales blocked for {staff}. Staff Daily Checklist not completed.")
-        st.stop()
-
-    # --- Duty Times (once per batch) ---
-    col1, col2 = st.columns(2)
-    with col1:
-        time_in = st.time_input("Duty IN", value=time(9, 0))
-    with col2:
-        time_out = st.time_input("Duty OUT", value=time(18, 0))
-    t1 = datetime.combine(date.today(), time_in)
-    t2 = datetime.combine(date.today(), time_out)
-    hours = round((t2 - t1).seconds / 3600, 2)
-    st.info(f"Working Hours: {hours}")
-
-    # ---------------- Multiple Entries ----------------
-    if "multi_entries" not in st.session_state:
-        st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
-
-    def add_entry():
-        st.session_state.multi_entries.append({
-            "nozzle": 1,
-            "fuel": list(fuel_price.keys())[0],
-            "opening": 0.0,
-            "closing": 0.0
-        })
-
-    st.markdown("### Enter Sales Entries")
-    total_litres = 0
-    total_amount = 0
 
     for i, entry in enumerate(st.session_state.multi_entries):
         # Adjusted column widths: Nozzle/Fuel/Opening/Closing/Litres/Amount
