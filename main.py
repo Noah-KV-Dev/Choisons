@@ -88,13 +88,17 @@ if page=="Sales Entry":
     st.subheader("Multiple Nozzle Entry")
     if "multi_entries" not in st.session_state: st.session_state.multi_entries=[{}]
 
-    # Function to add new row
+    # Add new entry button
     if st.button("Add Nozzle Entry"):
         st.session_state.multi_entries.append({})
 
     total_amount=0
+    to_remove = []
+
     for i, entry in enumerate(st.session_state.multi_entries):
-        cols = st.columns([1,1,1,1,1,1])
+        # Column widths: Nozzle=1, Fuel=1, Opening=2, Closing=2, Litres=1, Amount=1, Remove=1
+        cols = st.columns([1,1,2,2,1,1,1])
+        
         # Nozzle
         entry["nozzle"] = cols[0].number_input(
             f"Nozzle {i+1}", min_value=1, max_value=12,
@@ -102,7 +106,7 @@ if page=="Sales Entry":
         )
         # Fuel
         entry["fuel"] = cols[1].selectbox(
-            "Fuel", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry.get("fuel","Petrol")), key=f"fuel_{i}"
+            "", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry.get("fuel","Petrol")), key=f"fuel_{i}"
         )
         # Opening
         try:
@@ -112,20 +116,28 @@ if page=="Sales Entry":
         except:
             default_opening=0.0
         entry["opening"] = cols[2].number_input(
-            "Opening", value=entry.get("opening",default_opening), key=f"opening_{i}"
+            "", value=entry.get("opening",default_opening), key=f"opening_{i}", format="%.2f"
         )
         # Closing
         entry["closing"] = cols[3].number_input(
-            "Closing", value=entry.get("closing",entry.get("opening",default_opening)), key=f"closing_{i}"
+            "", value=entry.get("closing",entry.get("opening",default_opening)), key=f"closing_{i}", format="%.2f"
         )
         # Litres
         entry["litres"] = max(entry["closing"]-entry["opening"],0)
-        cols[4].metric("Litres", entry["litres"])
+        cols[4].metric("L", entry["litres"], delta=None)
         # Amount
         entry["price"] = fuel_price[entry["fuel"]]
         entry["total"] = round(entry["litres"]*entry["price"],2)
-        cols[5].metric("Amount ₹", entry["total"])
+        cols[5].metric("₹", entry["total"], delta=None)
+        # Remove button
+        if cols[6].button("Remove", key=f"remove_{i}"):
+            to_remove.append(i)
+
         total_amount += entry["total"]
+
+    # Remove entries marked for deletion
+    for i in reversed(to_remove):
+        st.session_state.multi_entries.pop(i)
 
     st.info(f"Grand Total Amount: ₹ {total_amount}")
 
@@ -155,6 +167,7 @@ if page=="Sales Entry":
         conn.commit()
         st.success("All Entries Saved")
         st.session_state.multi_entries=[{}]  # reset entries
+
 
 
     # Today summary
