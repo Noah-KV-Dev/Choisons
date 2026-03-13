@@ -132,20 +132,21 @@ if page == "Sales Entry":
     total_amount = 0
 
     for i, entry in enumerate(st.session_state.multi_entries):
-        cols = st.columns([1,1,1,1,1,1])  # Nozzle | Fuel | Opening | Closing | Litres | Amount
-        entry["nozzle"] = cols[0].number_input(f"Nozzle {i+1}", min_value=1, max_value=12, value=entry.get("nozzle",1), key=f"nozzle_{i}")
-        entry["fuel"] = cols[1].selectbox(f"Fuel {i+1}", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry.get("fuel", list(fuel_price.keys())[0])), key=f"fuel_{i}")
-        entry["opening"] = cols[2].number_input(f"Opening {i+1}", value=float(entry.get("opening",0)), step=0.01, format="%.2f", key=f"opening_{i}")
-        entry["closing"] = cols[3].number_input(f"Closing {i+1}", value=float(entry.get("closing",0)), step=0.01, format="%.2f", key=f"closing_{i}")
-        price = float(fuel_price[entry["fuel"]])
-        litres = round(max(entry["closing"] - entry["opening"],0),2)
-        amount = round(litres * price,2)
-        entry["litres"] = litres
-        entry["total"] = amount
-        total_litres += litres
-        total_amount += amount
-        cols[4].write(f"Litres: {litres}")
-        cols[5].write(f"Amount: ₹ {amount}")
+    cols = st.columns([0.7, 1.2, 2, 2, 0.8, 0.8])  # Adjusted sizes
+    entry["nozzle"] = cols[0].number_input(f"Nozzle {i+1}", min_value=1, max_value=12, value=entry.get("nozzle",1), key=f"nozzle_{i}")
+    entry["fuel"] = cols[1].selectbox(f"Fuel {i+1}", list(fuel_price.keys()), index=list(fuel_price.keys()).index(entry.get("fuel", list(fuel_price.keys())[0])), key=f"fuel_{i}")
+    entry["opening"] = cols[2].number_input(f"Opening {i+1}", value=float(entry.get("opening",0)), step=0.01, format="%.2f", key=f"opening_{i}")
+    entry["closing"] = cols[3].number_input(f"Closing {i+1}", value=float(entry.get("closing",0)), step=0.01, format="%.2f", key=f"closing_{i}")
+    price = float(fuel_price[entry["fuel"]])
+    litres = round(max(entry["closing"] - entry["opening"],0),2)
+    amount = round(litres * price,2)
+    entry["litres"] = litres
+    entry["total"] = amount
+    total_litres += litres
+    total_amount += amount
+    cols[4].write(f"Litres: {litres}")
+    cols[5].write(f"Amount: ₹ {amount}")
+
 
     st.button("Add Another Entry", on_click=add_entry)
 
