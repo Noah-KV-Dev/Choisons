@@ -224,54 +224,117 @@ for i, entry in enumerate(st.session_state.multi_entries):
         st.info("No sales entries for today")
 
 if page == "Sales Entry":
-    st.title("Fuel Sales Entry")
+    st.title("Fuel Sales Entry (Multiple Opening/Closing)")
 
-    # --- your multi-entry code here ---
+    # --- Staff Selection ---
+    staff_list = pd.read_sql("SELECT name FROM staff", conn)["name"].tolist()
+    if not staff_list:
+        st.warning("Admin must add staff first")
+        st.stop()
+    staff = st.selectbox("Staff", staff_list)
+
+    # --- Checklist validation ---
+    cursor.execute("SELECT completed FROM checklist WHERE date=? AND staff=?", (str(date.today()), staff))
+    result = cursor.fetchone()
+    if not result or result[0] == 0:
+        st.error(f"⚠ Sales blocked for {staff}. Staff Daily Checklist not completed.")
+        st.stop()
+
+    # --- Duty Times (once per batch) ---
+    col1, col2 = st.columns(2)
+    with col1:
+        time_in = st.time_input("Duty IN", value=time(9, 0))
+    with col2:
+        time_out = st.time_input("Duty OUT", value=time(18, 0))
+    t1 = datetime.combine(date.today(), time_in)
+    t2 = datetime.combine(date.today(), time_out)
+    hours = round((t2 - t1).seconds / 3600, 2)
+    st.info(f"Working Hours: {hours}")
+
+    # ---------------- Multiple Entries ----------------
+    if "multi_entries" not in st.session_state:
+        st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
+
+    def add_entry():
+        st.session_state.multi_entries.append({
+            "nozzle": 1,
+            "fuel": list(fuel_price.keys())[0],
+            "opening": 0.0,
+            "closing": 0.0
+        })
+
+    st.markdown("### Enter Sales Entries")
+    total_litres = 0
+    total_amount = 0
+
     for i, entry in enumerate(st.session_state.multi_entries):
-        cols = st.columns([0.7,1.2,2,2,0.8,0.8])
-        entry["nozzle"] = cols[0].number_input("Nozzle", value=entry.get("nozzle",1), key=f"nozzle_{i}")
-        entry["fuel"] = cols[1].selectbox("Fuel", list(fuel_price.keys()), index=0, key=f"fuel_{i}")
-        entry["opening"] = cols[2].number_input("Opening", value=float(entry.get("opening",0)), key=f"opening_{i}")
-        entry["closing"] = cols[3].number_input("Closing", value=float(entry.get("closing",0)), key=f"closing_{i}")
-        litres = round(max(entry["closing"] - entry["opening"],0),2)
-        amount = round(litres * fuel_price[entry["fuel"]],2)
+        # Adjusted column widths: Nozzle/Fuel/Opening/Closing/Litres/Amount
+        cols = st.columns([0.7, 1.2, 2, 2, 0.8, 0.8])
+        entry["nozzle"] = cols[0].number_input(
+            f"Nozzle {i+1}", min_value=1, max_value=12, value=entry.get("nozzle", 1), 
+            key=f"nozzle_{i}_{len(st.session_state.multi_entries)}"
+        )
+        entry["fuel"] = cols[1].selectbox(
+            f"Fuel {i+1}", list(fuel_price.keys()),
+            index=list(fuel_price.keys()).index(entry.get("fuel", list(fuel_price.keys())[0])),
+            key=f"fuel_{i}_{len(st.session_state.multi_entries)}"
+        )
+        entry["opening"] = cols[2].number_input(
+            f"Opening {i+1}", value=float(entry.get("opening", 0)), step=0.01, format="%.2f",
+            key=f"opening_{i}_{len(st.session_state.multi_entries)}"
+        )
+        entry["closing"] = cols[3].number_input(
+            f"Closing {i+1}", value=float(entry.get("closing", 0)), step=0.01, format="%.2f",
+            key=f"closing_{i}_{len(st.session_state.multi_entries)}"
+        )
+        price = float(fuel_price[entry["fuel"]])
+        litres = round(max(entry["closing"] - entry["opening"], 0), 2)
+        amount = round(litres * price, 2)
         entry["litres"] = litres
         entry["total"] = amount
+        total_litres += litres
+        total_amount += amount
         cols[4].write(f"Litres: {litres}")
         cols[5].write(f"Amount: ₹ {amount}")
 
-    if st.button("Save All Entries"):
-        for entry in st.session_state.multi_entries:
-            cursor.execute("""
-                INSERT INTO sales(date, staff, nozzle, fuel, opening, closing, litres, price, total)
-                VALUES(?,?,?,?,?,?,?,?,?)
-            """,(str(date.today()), staff, entry["nozzle"], entry["fuel"], entry["opening"], entry["closing"], entry["litres"], fuel_price[entry["fuel"]], entry["total"]))
-        conn.commit()
-        st.success("All Entries Saved ✅")
+    st.button("Add Another Entry", on_click=add_entry)
 
-# <--- NOW elif WILL WORK -->
-elif page == "Reports":
-    st.title("Reports")
-    df = pd.read_sql("SELECT * FROM sales",conn)
-    for col in ["opening","closing","litres","total","paytm","sbi","hppay","advance","creditor","balance","hours"]:
-        if col not in df.columns: df[col]=0
-    report_type = st.selectbox("Report Type",["Daily","Monthly"])
-    if report_type=="Daily":
-        d = st.date_input("Select Date",date.today())
-        r = df[df["date"]==str(d)]
-        st.dataframe(r)
-        if not r.empty:
-            daily_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(daily_summary.set_index("staff")["Litres"])
-    else:
-        df["month"]=df["date"].str.slice(0,7)
-        months=df["month"].unique()
-        m=st.selectbox("Month",months)
-        r=df[df["month"]==m]
-        st.dataframe(r)
-        if not r.empty:
-            monthly_summary=r.groupby("staff").agg(Litres=("litres","sum"),Sales=("total","sum"),Hours=("hours","sum")).reset_index()
-            st.bar_chart(monthly_summary.set_index("staff")["Litres"])
+    st.markdown(f"### Grand Total Litres: {total_litres} | Grand Total Amount: ₹ {total_amount}")
+
+    # ---------------- Payments (once per batch) ----------------
+    st.subheader("Payments")
+    paytm = float(st.number_input("Paytm", 0.0, step=0.01))
+    sbi = float(st.number_input("SBI", 0.0, step=0.01))
+    hppay = float(st.number_input("HP Pay", 0.0, step=0.01))
+    advance = float(st.number_input("Advance Paid", 0.0, step=0.01))
+    creditor = float(st.number_input("Creditor", 0.0, step=0.01))
+
+    # ---------------- Save Entries ----------------
+    if st.button("Save All Entries"):
+        if not st.session_state.multi_entries:
+            st.warning("No entries to save")
+        else:
+            for entry in st.session_state.multi_entries:
+                balance = round(entry["total"] - (paytm + sbi + hppay + advance + creditor), 2)
+                try:
+                    cursor.execute("""
+                        INSERT INTO sales(
+                            date, staff, nozzle, fuel, opening, closing, litres, price, total,
+                            paytm, sbi, hppay, advance, creditor, balance,
+                            time_in, time_out, hours
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, (
+                        str(date.today()), staff, int(entry["nozzle"]), entry["fuel"], entry["opening"], entry["closing"], entry["litres"], float(fuel_price[entry["fuel"]]), entry["total"],
+                        paytm, sbi, hppay, advance, creditor, balance,
+                        t1.strftime("%H:%M"), t2.strftime("%H:%M"), hours
+                    ))
+                except Exception as e:
+                    st.error(f"Error saving entry: {e}")
+            conn.commit()
+            st.success("All Sales Entries Saved ✅")
+            # Reset entries
+            st.session_state.multi_entries = [{"nozzle": 1, "fuel": list(fuel_price.keys())[0], "opening": 0.0, "closing": 0.0}]
+
 
 # ---------------- STAFF DAILY CHECKLIST ----------------
 elif page=="Staff Daily Checklist":
